@@ -1,0 +1,21 @@
+.gradientBackground {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(4px);
+  background: linear-gradient(-45deg, #fb923c, #ec4899, #3b82f6, #10b981);
+  background-size: 400% 400%;
+}
+
+.glassOverlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.particleCanvas {
+  opacity: 0.3;
+}
