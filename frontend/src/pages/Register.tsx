@@ -128,11 +128,13 @@ export default function Register() {
       }
 
       // Auto-login after successful registration
-      await login(result.data.email, data.password);
+      const { token, ...userData } = result.data;
+      login(userData, token);
 
       toast({
-        title: 'Success',
-        description: 'Account created successfully!',
+        title: 'Welcome!',
+        description: `Account created successfully for ${userData.name}!`,
+        duration: 3000,
       });
 
       navigate('/dashboard');

@@ -265,6 +265,21 @@ export default function Reports() {
     }
   };
 
+  const handlePreviewBill = async (assetId: string) => {
+    try {
+      const blob = await assetService.previewBill(assetId);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error('Error previewing bill:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to preview bill',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDeleteVendor = async (vendorName: string) => {
     try {
       // Get all assets to find those from this vendor

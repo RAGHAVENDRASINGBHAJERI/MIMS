@@ -1,5 +1,5 @@
 import express from 'express';
-import { createAsset, getAssets, getAsset, downloadBill, updateAsset, deleteAsset, uploadMiddleware } from '../controllers/assetController.js';
+import { createAsset, getAssets, getAsset, downloadBill, updateAsset, deleteAsset, uploadMiddleware, previewBill } from '../controllers/assetController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -21,5 +21,8 @@ router.delete('/:id', protect, deleteAsset);
 
 // GET /api/assets/:id/bill - Download bill file
 router.get('/:id/bill', protect, downloadBill);
+
+// GET /api/assets/:id/preview - Preview bill file
+router.get('/:id/preview', protect, previewBill);
 
 export default router;

@@ -254,20 +254,22 @@ export const exportExcel = async (req, res, next) => {
       ];
     } else {
       worksheet.columns = [
-        { header: 'Item Name', key: 'itemName', width: 30 },
-        { header: 'Type', key: 'type', width: 15 },
-        { header: 'Department', key: 'departmentName', width: 25 },
-        { header: 'Category', key: 'category', width: 20 },
-        { header: 'Quantity', key: 'quantity', width: 15 },
-        { header: 'Price Per Item', key: 'pricePerItem', width: 15 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 },
-        { header: 'Vendor Name', key: 'vendorName', width: 25 },
-        { header: 'Vendor Address', key: 'vendorAddress', width: 30 },
-        { header: 'Contact Number', key: 'contactNumber', width: 20 },
-        { header: 'Email', key: 'email', width: 25 },
-        { header: 'Bill Number', key: 'billNo', width: 20 },
+        { header: 'Sl No.', key: 'slNo', width: 10 },
+        { header: 'Date', key: 'date', width: 15 },
+        { header: 'College ISR No.', key: 'collegeISRNo', width: 20 },
+        { header: 'IT ISR No.', key: 'itISRNo', width: 20 },
+        { header: 'Particulars', key: 'particulars', width: 30 },
+        { header: 'Vendor', key: 'vendor', width: 25 },
         { header: 'Bill Date', key: 'billDate', width: 15 },
-        { header: 'Academic Year', key: 'academicYear', width: 15 }
+        { header: 'Bill No.', key: 'billNo', width: 20 },
+        { header: 'Quantity', key: 'quantity', width: 15 },
+        { header: 'Rate', key: 'rate', width: 15 },
+        { header: 'Amount', key: 'amount', width: 15 },
+        { header: 'IGST', key: 'igst', width: 10 },
+        { header: 'CGST', key: 'cgst', width: 10 },
+        { header: 'SGST', key: 'sgst', width: 10 },
+        { header: 'Grand Total', key: 'grandTotal', width: 15 },
+        { header: 'Remark', key: 'remark', width: 25 }
       ];
     }
 
@@ -293,20 +295,22 @@ export const exportExcel = async (req, res, next) => {
         };
       }
       return {
-        itemName: item.itemName || '',
-        type: item.type || '',
-        departmentName: item.department?.name || '',
-        category: item.category || '',
-        quantity: item.quantity || '',
-        pricePerItem: item.pricePerItem || '',
-        totalAmount: item.totalAmount || '',
-        vendorName: item.vendorName || '',
-        vendorAddress: item.vendorAddress || '',
-        contactNumber: item.contactNumber || '',
-        email: item.email || '',
-        billNo: item.billNo || '',
+        slNo: report.indexOf(item) + 1,
+        date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+        collegeISRNo: item.collegeISRNo || '',
+        itISRNo: item.itISRNo || '',
+        particulars: item.itemName || '',
+        vendor: item.vendorName || '',
         billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-        academicYear: item.academicYear || ''
+        billNo: item.billNo || '',
+        quantity: item.quantity || '',
+        rate: item.pricePerItem || '',
+        amount: item.totalAmount || '',
+        igst: item.igst || '',
+        cgst: item.cgst || '',
+        sgst: item.sgst || '',
+        grandTotal: item.grandTotal || '',
+        remark: item.remark || ''
       };
     });
 
@@ -318,11 +322,11 @@ export const exportExcel = async (req, res, next) => {
     // Add summary rows for combined report at the end
     if (summary) {
       worksheet.addRow({}); // Empty row for separation
-      worksheet.addRow({ itemName: 'Summary', type: '', departmentName: '', category: '', quantity: '', pricePerItem: '', totalAmount: '', vendorName: '', vendorAddress: '', contactNumber: '', email: '', billNo: '', billDate: '', academicYear: '' });
-      worksheet.addRow({ itemName: 'Total Capital Assets', type: '', departmentName: '', category: '', quantity: '', pricePerItem: '', totalAmount: summary.totalCapital, vendorName: '', vendorAddress: '', contactNumber: '', email: '', billNo: '', billDate: '', academicYear: '' });
-      worksheet.addRow({ itemName: 'Total Revenue Assets', type: '', departmentName: '', category: '', quantity: '', pricePerItem: '', totalAmount: summary.totalRevenue, vendorName: '', vendorAddress: '', contactNumber: '', email: '', billNo: '', billDate: '', academicYear: '' });
-      worksheet.addRow({ itemName: 'Grand Total', type: '', departmentName: '', category: '', quantity: '', pricePerItem: '', totalAmount: summary.grandTotal, vendorName: '', vendorAddress: '', contactNumber: '', email: '', billNo: '', billDate: '', academicYear: '' });
-      worksheet.addRow({ itemName: 'Total Items', type: '', departmentName: '', category: '', quantity: summary.itemCount, pricePerItem: '', totalAmount: '', vendorName: '', vendorAddress: '', contactNumber: '', email: '', billNo: '', billDate: '', academicYear: '' });
+      worksheet.addRow({ slNo: 'Summary', date: '', collegeISRNo: '', itISRNo: '', particulars: '', vendor: '', billDate: '', billNo: '', quantity: '', rate: '', amount: '', igst: '', cgst: '', sgst: '', grandTotal: '', remark: '' });
+      worksheet.addRow({ slNo: 'Total Capital Assets', date: '', collegeISRNo: '', itISRNo: '', particulars: '', vendor: '', billDate: '', billNo: '', quantity: '', rate: '', amount: summary.totalCapital, igst: '', cgst: '', sgst: '', grandTotal: '', remark: '' });
+      worksheet.addRow({ slNo: 'Total Revenue Assets', date: '', collegeISRNo: '', itISRNo: '', particulars: '', vendor: '', billDate: '', billNo: '', quantity: '', rate: '', amount: summary.totalRevenue, igst: '', cgst: '', sgst: '', grandTotal: '', remark: '' });
+      worksheet.addRow({ slNo: 'Grand Total', date: '', collegeISRNo: '', itISRNo: '', particulars: '', vendor: '', billDate: '', billNo: '', quantity: '', rate: '', amount: summary.grandTotal, igst: '', cgst: '', sgst: '', grandTotal: '', remark: '' });
+      worksheet.addRow({ slNo: 'Total Items', date: '', collegeISRNo: '', itISRNo: '', particulars: '', vendor: '', billDate: '', billNo: '', quantity: summary.itemCount, rate: '', amount: '', igst: '', cgst: '', sgst: '', grandTotal: '', remark: '' });
     }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -11,7 +11,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import AnimatedRoutes from "@/components/AnimatedRoutes";
 import GlobalAnimationWrapper from "@/components/layout/GlobalAnimationWrapper";
-import Index from "./pages/Landing";
+import Landing from "./pages/Landing";
+import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import SelectAssetType from "./pages/SelectAssetType";
@@ -40,7 +41,8 @@ const App = () => (
                     <AnimatedRoutes>
                       <Route path="/login" element={<Login />} />
                       <Route path="/register" element={<Register />} />
-                      <Route path="/" element={
+                      <Route path="/" element={<Landing />} />
+                      <Route path="/dashboard" element={
                         <ProtectedRoute>
                           <Index />
                         </ProtectedRoute>

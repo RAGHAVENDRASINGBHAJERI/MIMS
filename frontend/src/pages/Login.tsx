@@ -83,8 +83,9 @@ export default function Login() {
       login(userData, token);
       
       toast({
-        title: 'Success',
-        description: 'Logged in successfully',
+        title: 'Welcome back!',
+        description: `Successfully logged in as ${userData.name}`,
+        duration: 3000,
       });
       
       navigate('/');

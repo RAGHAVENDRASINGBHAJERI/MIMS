@@ -18,8 +18,8 @@ import { Button } from '@/components/ui/button';
 
 const navigationItems = [
   {
-    title: 'Home',
-    href: '/',
+    title: 'Dashboard',
+    href: '/dashboard',
     icon: Home,
   },
   {
@@ -59,6 +59,11 @@ export function Sidebar() {
     }] : []),
   ];
 
+  // Filter navigation items for department-officer: only show Dashboard
+  const filteredNavigationItems = user?.role === 'department-officer'
+    ? dynamicNavigationItems.filter(item => item.href === '/dashboard')
+    : dynamicNavigationItems;
+
   return (
     <AnimatePresence>
       {state.sidebarOpen && (
@@ -82,7 +87,7 @@ export function Sidebar() {
             className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-70 bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 z-50 md:relative md:top-0 md:h-screen md:z-0"
           >
             <div className="flex flex-col h-full p-4 space-y-2">
-              {dynamicNavigationItems.map((item) => (
+              {filteredNavigationItems.map((item) => (
                 <NavLink key={item.title} to={item.href}>
                   {({ isActive: navIsActive }) => (
                     <Button

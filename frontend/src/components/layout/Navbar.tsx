@@ -144,9 +144,9 @@ export function Navbar() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
           >
-            Home
+            Dashboard
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}

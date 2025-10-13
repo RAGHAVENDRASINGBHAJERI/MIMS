@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
 
   // Show loading while checking authentication
@@ -28,6 +28,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       // Already on login page, do not redirect again
       return null;
     }
+  }
+
+  // Restrict department-officer role: only allow access to /dashboard
+  if (user?.role === 'department-officer' && location.pathname !== '/dashboard') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

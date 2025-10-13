@@ -103,18 +103,18 @@ export const assetService = {
       headers,
       body: formData,
     });
-    
+
     console.log('Response status:', response.status);
     console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    
+
     const result = await response.json();
     console.log('Response data:', result);
-    
+
     if (!response.ok) {
       console.error('Asset creation failed:', result);
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
-    
+
     return result.data;
   },
 
@@ -190,5 +190,23 @@ export const assetService = {
       const result = await response.json();
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
+  },
+
+  // Preview bill file
+  previewBill: async (id: string): Promise<Blob> => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/assets/${id}/preview`, { headers });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
   },
 };

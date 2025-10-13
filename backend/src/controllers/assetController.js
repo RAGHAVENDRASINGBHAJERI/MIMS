@@ -20,9 +20,9 @@ export const createAsset = async (req, res, next) => {
       size: req.file.size
     } : 'No file');
     console.log('Request headers:', req.headers);
-    
-    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type } = req.body;
-    
+
+    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
+
     if (!req.file) {
       console.log('ERROR: No file provided');
       return res.status(400).json({
@@ -40,7 +40,7 @@ export const createAsset = async (req, res, next) => {
     const quantityNum = parseInt(quantity);
     const priceNum = parseFloat(pricePerItem);
     const totalAmount = quantityNum * priceNum;
-    
+
     const asset = await Asset.create({
       department,
       category,
@@ -55,7 +55,14 @@ export const createAsset = async (req, res, next) => {
       billNo,
       billDate: new Date(billDate),
       billFileId: fileId,
-      type: type || 'capital'
+      type: type || 'capital',
+      collegeISRNo,
+      itISRNo,
+      igst: igst ? parseFloat(igst) : 0,
+      cgst: cgst ? parseFloat(cgst) : 0,
+      sgst: sgst ? parseFloat(sgst) : 0,
+      grandTotal: grandTotal ? parseFloat(grandTotal) : totalAmount,
+      remark
     });
     console.log('Asset created:', asset);
 
@@ -69,7 +76,7 @@ export const createAsset = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error creating asset:', error);
-    
+
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => err.message);
@@ -79,7 +86,7 @@ export const createAsset = async (req, res, next) => {
         details: validationErrors
       });
     }
-    
+
     // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
@@ -87,7 +94,7 @@ export const createAsset = async (req, res, next) => {
         error: 'Asset with this information already exists'
       });
     }
-    
+
     next(error);
   }
 };
@@ -158,9 +165,38 @@ export const downloadBill = async (req, res, next) => {
   }
 };
 
+export const previewBill = async (req, res, next) => {
+  try {
+    const asset = await Asset.findById(req.params.id);
+
+    if (!asset) {
+      return res.status(404).json({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+
+    const downloadStream = downloadFile(asset.billFileId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+
+    downloadStream.pipe(res);
+
+    downloadStream.on('error', (error) => {
+      res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateAsset = async (req, res, next) => {
   try {
-    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type } = req.body;
+    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
 
     const quantityNum = parseInt(quantity);
     const priceNum = parseFloat(pricePerItem);
@@ -179,7 +215,14 @@ export const updateAsset = async (req, res, next) => {
       email,
       billNo,
       billDate: new Date(billDate),
-      type: type || 'capital'
+      type: type || 'capital',
+      collegeISRNo,
+      itISRNo,
+      igst: igst ? parseFloat(igst) : 0,
+      cgst: cgst ? parseFloat(cgst) : 0,
+      sgst: sgst ? parseFloat(sgst) : 0,
+      grandTotal: grandTotal ? parseFloat(grandTotal) : totalAmount,
+      remark
     };
 
     // If a new file is uploaded, update the billFileId

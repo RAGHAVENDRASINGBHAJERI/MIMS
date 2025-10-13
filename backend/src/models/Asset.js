@@ -68,6 +68,37 @@ const assetSchema = new mongoose.Schema({
   billFileId: {
     type: mongoose.Schema.Types.ObjectId,
     required: [true, 'Bill file is required']
+  },
+  collegeISRNo: {
+    type: String,
+    trim: true
+  },
+  itISRNo: {
+    type: String,
+    trim: true
+  },
+  igst: {
+    type: Number,
+    default: 0,
+    min: [0, 'IGST cannot be negative']
+  },
+  cgst: {
+    type: Number,
+    default: 0,
+    min: [0, 'CGST cannot be negative']
+  },
+  sgst: {
+    type: Number,
+    default: 0,
+    min: [0, 'SGST cannot be negative']
+  },
+  grandTotal: {
+    type: Number,
+    default: 0
+  },
+  remark: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true
