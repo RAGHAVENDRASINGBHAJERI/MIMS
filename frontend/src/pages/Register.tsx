@@ -65,7 +65,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
 
@@ -98,10 +98,20 @@ export default function Register() {
   const selectedRole = watch('role');
 
   const onSubmit = async (data: RegisterFormValues) => {
+    // Check if user is not admin and trying to create department-officer
+    if (user?.role !== 'admin' && data.role === 'department-officer') {
+      toast({
+        title: 'Access Denied',
+        description: 'Only database admins can create department officer accounts.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       console.log('Attempting to register with data:', { name: data.name, email: data.email, role: data.role });
-      
+
       const submitData: any = {
         name: data.name,
         email: data.email,
@@ -111,7 +121,7 @@ export default function Register() {
       if (selectedRole === 'department-officer') {
         submitData.department = data.department;
       }
-      
+
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
@@ -119,10 +129,10 @@ export default function Register() {
         },
         body: JSON.stringify(submitData)
       });
-      
+
       const result = await response.json();
       console.log('Registration response:', { status: response.status, data: result });
-      
+
       if (!response.ok) {
         throw new Error(result.error || `HTTP error! status: ${response.status}`);
       }
@@ -288,9 +298,8 @@ export default function Register() {
                   )}
                 >
                   <option value="">Select Role</option>
-                  <option value="admin">Admin</option>
-                  <option value="department-officer">Department Officer</option>
-                  <option value="user">User</option>
+                  {user?.role === 'admin' && <option value="admin">Admin</option>}
+                  {user?.role === 'admin' && <option value="department-officer">Department Officer</option>}
                 </select>
                 {errors.role && (
                   <motion.p

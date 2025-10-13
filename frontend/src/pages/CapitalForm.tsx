@@ -31,6 +31,13 @@ const assetSchema = z.object({
   billDate: z.string().min(1, 'Bill date is required'),
   department: z.string().min(1, 'Department is required'),
   category: z.string().min(1, 'Category is required'),
+  collegeISRNo: z.string().optional(),
+  itISRNo: z.string().optional(),
+  igst: z.number().min(0, 'IGST cannot be negative').optional(),
+  cgst: z.number().min(0, 'CGST cannot be negative').optional(),
+  sgst: z.number().min(0, 'SGST cannot be negative').optional(),
+  grandTotal: z.number().min(0, 'Grand total cannot be negative').optional(),
+  remark: z.string().optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -110,6 +117,13 @@ export default function CapitalForm() {
         category: data.category,
         type: 'capital',
         billFile: selectedFile,
+        collegeISRNo: data.collegeISRNo,
+        itISRNo: data.itISRNo,
+        igst: data.igst,
+        cgst: data.cgst,
+        sgst: data.sgst,
+        grandTotal: data.grandTotal,
+        remark: data.remark,
       };
 
       console.log('Asset data to send:', assetData);
@@ -393,11 +407,120 @@ export default function CapitalForm() {
               </div>
             </motion.div>
 
-            {/* Receipt Upload Section */}
+            {/* ISR Numbers Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <FileText className="h-4 w-4 text-purple-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">ISR Numbers</h3>
+                  <p className="text-sm text-gray-600">Internal Service Request numbers.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormInput
+                  label="College ISR No"
+                  placeholder="Enter college ISR number"
+                  {...register('collegeISRNo')}
+                  error={errors.collegeISRNo?.message}
+                />
+                <FormInput
+                  label="IT ISR No"
+                  placeholder="Enter IT ISR number"
+                  {...register('itISRNo')}
+                  error={errors.itISRNo?.message}
+                />
+              </div>
+            </motion.div>
+
+            {/* GST Details Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <Calculator className="h-4 w-4 text-orange-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">GST Details</h3>
+                  <p className="text-sm text-gray-600">Goods and Services Tax information.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormInput
+                  label="IGST (₹)"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter IGST amount"
+                  {...register('igst', { valueAsNumber: true })}
+                  error={errors.igst?.message}
+                />
+                <FormInput
+                  label="CGST (₹)"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter CGST amount"
+                  {...register('cgst', { valueAsNumber: true })}
+                  error={errors.cgst?.message}
+                />
+                <FormInput
+                  label="SGST (₹)"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter SGST amount"
+                  {...register('sgst', { valueAsNumber: true })}
+                  error={errors.sgst?.message}
+                />
+                <FormInput
+                  label="Grand Total (₹)"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter grand total"
+                  {...register('grandTotal', { valueAsNumber: true })}
+                  error={errors.grandTotal?.message}
+                />
+              </div>
+            </motion.div>
+
+            {/* Remarks Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <FileText className="h-4 w-4 text-gray-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Remarks</h3>
+                  <p className="text-sm text-gray-600">Additional notes or remarks.</p>
+                </div>
+              </div>
+              <div className="max-w-2xl">
+                <Textarea
+                  placeholder="Enter any additional remarks..."
+                  className="min-h-[100px]"
+                  {...register('remark')}
+                />
+              </div>
+            </motion.div>
+
+            {/* Receipt Upload Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
               className="pb-6"
             >
               <div className="flex items-center gap-2 mb-4">
@@ -424,7 +547,7 @@ export default function CapitalForm() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.9 }}
               className="flex justify-end gap-4 pt-6 border-t border-gray-200"
             >
               <Button

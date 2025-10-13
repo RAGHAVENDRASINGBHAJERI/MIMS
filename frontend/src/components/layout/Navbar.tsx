@@ -161,7 +161,7 @@ export function Navbar() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/add-material')}
+            onClick={() => navigate('/login')}
           >
             Add New Material
           </motion.button>
@@ -169,7 +169,7 @@ export function Navbar() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/reports')}
+            onClick={() => navigate('/login')}
           >
             Reports
           </motion.button>

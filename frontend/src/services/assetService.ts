@@ -37,6 +37,13 @@ export interface AssetFormData {
   category: string;
   type?: 'capital' | 'revenue';
   billFile?: File;
+  collegeISRNo?: string;
+  itISRNo?: string;
+  igst?: number;
+  cgst?: number;
+  sgst?: number;
+  grandTotal?: number;
+  remark?: string;
 }
 
 export interface AssetListResponse {

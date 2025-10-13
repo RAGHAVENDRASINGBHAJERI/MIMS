@@ -157,7 +157,7 @@ export default function Landing() {
                   </div>
                   
                   <Button
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/login')}
                     className="group-hover:bg-primary-hover transition-colors"
                     size="lg"
                   >
@@ -185,7 +185,7 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/login')}
               variant="secondary"
               size="lg"
               className="bg-white text-primary hover:bg-white/90"
@@ -193,7 +193,7 @@ export default function Landing() {
               Add Capital Asset
             </Button>
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/login')}
               variant="secondary"
               size="lg"
               className="bg-white text-primary hover:bg-white/90"

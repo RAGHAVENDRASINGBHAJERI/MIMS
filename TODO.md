@@ -1,13 +1,25 @@
-# TODO: Isolate Landing Page and Dashboard for Department Officer
+# Frontend Form Updates for Asset Management
 
-## Tasks
-- [x] Update frontend/src/App.tsx to route '/' to Landing.tsx (public) and '/dashboard' to Index.tsx (protected)
-- [x] Modify frontend/src/components/ProtectedRoute.tsx to restrict department-officer role access
-- [x] Update frontend/src/components/layout/Sidebar.tsx navigation items for department-officer
-- [x] Update frontend/src/components/layout/Navbar.tsx links to point to '/dashboard'
-- [x] Update frontend/src/pages/Landing.tsx navigation links considering role restrictions
+## Tasks to Complete
 
-## Followup Steps
-- [ ] Test routing for different roles to ensure restrictions work
-- [ ] Verify department-officer can access only landing page and dashboard
-- [ ] Confirm other roles retain full access
+### 1. Update AssetFormData Interface
+- [x] Add optional fields: collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark to AssetFormData interface in assetService.ts
+
+### 2. Update CapitalForm.tsx
+- [ ] Add new fields to assetSchema validation
+- [ ] Add ISR Numbers section to form
+- [ ] Add GST Details section to form
+- [ ] Add Remarks section to form
+- [ ] Update onSubmit function to include new fields
+
+### 3. Update RevenueForm.tsx
+- [ ] Add new fields to assetSchema validation
+- [ ] Add ISR Numbers section to form
+- [ ] Add GST Details section to form
+- [ ] Add Remarks section to form
+- [ ] Update onSubmit function to include new fields
+
+### 4. Testing
+- [ ] Test CapitalForm submission with new fields
+- [ ] Test RevenueForm submission with new fields
+- [ ] Verify backend accepts all fields correctly
