@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, UserPlus, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import api from '@/services/api';
+import { createAdmin } from '@/services/authService';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -66,24 +66,8 @@ export default function CreateAdmin() {
     try {
       console.log('Attempting to create admin with data:', { name: data.name, email: data.email });
 
-      const response = await fetch('http://localhost:5000/api/auth/create-admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        })
-      });
-
-      const result = await response.json();
-      console.log('Create admin response:', { status: response.status, data: result });
-
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
-      }
+      const result = await createAdmin(data.name, data.email, data.password);
+      console.log('Create admin response:', result);
 
       // Auto-login after successful admin creation
       const { token, ...userData } = result.data;

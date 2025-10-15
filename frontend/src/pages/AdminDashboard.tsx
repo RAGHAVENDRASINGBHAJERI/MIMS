@@ -40,6 +40,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Dialog states
@@ -49,9 +50,39 @@ const AdminDashboard = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
 
   // Forms
-  const userForm = useForm();
-  const departmentForm = useForm();
-  const assetForm = useForm();
+  const userForm = useForm({
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: '',
+      department: '',
+    },
+  });
+  const departmentForm = useForm({
+    defaultValues: {
+      name: '',
+      type: '',
+    },
+  });
+  const assetForm = useForm({
+    defaultValues: {
+      // Add appropriate default values for asset form fields
+      itemName: '',
+      department: '',
+      category: '',
+      quantity: '',
+      unitPrice: '',
+      totalAmount: '',
+      description: '',
+      vendor: '',
+      purchaseDate: '',
+      warrantyExpiry: '',
+      location: '',
+      condition: '',
+      // Add file fields if needed
+    },
+  });
 
   // Load data
   const loadUsers = async () => {
@@ -94,8 +125,10 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'users') loadUsers();
-    else if (activeTab === 'departments') loadDepartments();
+    if (activeTab === 'users') {
+      loadUsers();
+      loadDepartments(); // Load departments for user form dropdown
+    } else if (activeTab === 'departments') loadDepartments();
     else if (activeTab === 'assets') loadAssets();
   }, [activeTab]);
 
@@ -717,10 +750,10 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assets.map((asset) => (
+                  {Array.isArray(assets) && assets.map((asset) => (
                     <TableRow key={asset._id}>
                       <TableCell>{asset.itemName}</TableCell>
-                      <TableCell>{asset.department.name}</TableCell>
+                      <TableCell>{asset.department?.name || 'N/A'}</TableCell>
                       <TableCell>{asset.category}</TableCell>
                       <TableCell>{asset.quantity}</TableCell>
                       <TableCell>₹{asset.totalAmount.toLocaleString()}</TableCell>

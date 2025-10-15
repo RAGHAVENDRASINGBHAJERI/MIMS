@@ -90,17 +90,40 @@ export function AssetFlowProvider({ children }: { children: React.ReactNode }) {
     const fetchData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        const [departments, categories, assets] = await Promise.all([
-          departmentService.getAllDepartments(),
-          categoryService.getAllCategories(),
-          assetService.getAssets(),
+        // Only fetch protected data if user is authenticated
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('No authentication token found, skipping protected data fetch');
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
+        // Fetch data in parallel, but handle auth errors gracefully
+        const departmentsPromise = departmentService.getAllDepartments().catch(err => {
+          console.warn('Failed to fetch departments:', err.message);
+          return []; // Return empty array on auth failure
+        });
+
+        const categoriesPromise = categoryService.getAllCategories();
+
+        const assetsPromise = assetService.getAssets().catch(err => {
+          console.warn('Failed to fetch assets:', err.message);
+          return { assets: [] }; // Return empty assets on auth failure
+        });
+
+        const [departments, categories, assetsResponse] = await Promise.all([
+          departmentsPromise,
+          categoriesPromise,
+          assetsPromise
         ]);
+
         console.log('Departments fetched:', departments);
         console.log('Categories fetched:', categories);
-        console.log('Assets fetched:', assets);
+        console.log('Assets fetched:', assetsResponse);
+
         dispatch({ type: 'SET_DEPARTMENTS', payload: departments });
         dispatch({ type: 'SET_CATEGORIES', payload: categories });
-        dispatch({ type: 'SET_ASSETS', payload: assets });
+        dispatch({ type: 'SET_ASSETS', payload: assetsResponse.assets || [] });
         dispatch({ type: 'SET_LOADING', payload: false });
       } catch (error: any) {
         console.error('Error fetching data:', error);

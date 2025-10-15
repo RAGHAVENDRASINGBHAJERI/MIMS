@@ -13,6 +13,9 @@ interface AuthContextType {
   login: (userData: User, token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isDepartmentOfficer: boolean;
+  isChiefAdministrativeOfficer: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,9 +50,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAuthenticated = !!user && !!token;
+  const isAdmin = user?.role === 'admin';
+  const isDepartmentOfficer = user?.role === 'department-officer';
+  const isChiefAdministrativeOfficer = user?.role === 'chief-administrative-officer';
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      login,
+      logout,
+      isAuthenticated,
+      isAdmin,
+      isDepartmentOfficer,
+      isChiefAdministrativeOfficer
+    }}>
       {children}
     </AuthContext.Provider>
   );

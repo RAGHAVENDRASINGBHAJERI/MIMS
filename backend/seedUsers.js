@@ -14,6 +14,14 @@ const seedUsers = async () => {
     await User.deleteMany({});
     console.log('Cleared existing users');
 
+    // Drop the index if it exists to avoid duplicate key error
+    try {
+      await mongoose.connection.db.collection('users').dropIndex('employeeId_1');
+      console.log('Dropped employeeId index');
+    } catch (error) {
+      console.log('Index not found or already dropped');
+    }
+
     // Find departments for reference
     const departments = await Department.find({});
     if (departments.length === 0) {
@@ -27,6 +35,12 @@ const seedUsers = async () => {
         email: 'admin@gmail.com',
         password: 'admin123', // Will be hashed
         role: 'admin'
+      },
+      {
+        name: 'Chief Administrative Officer',
+        email: 'cao@gmail.com',
+        password: 'cao123', // Will be hashed
+        role: 'chief-administrative-officer'
       },
       {
         name: 'Department Officer',

@@ -80,7 +80,7 @@ export const login = async (req, res, next) => {
     console.log('Request body:', req.body);
     console.log('Request headers:', req.headers);
     console.log('Request origin:', req.get('origin'));
-    
+
     const { email, password } = req.body;
 
     // Check if user exists
@@ -111,6 +111,49 @@ export const login = async (req, res, next) => {
         email: user.email,
         role: user.role,
         department: user.department,
+        token
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createAdmin = async (req, res, next) => {
+  try {
+    console.log('=== CREATE ADMIN ENDPOINT HIT ===');
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    console.log('Request origin:', req.get('origin'));
+
+    const { name, email, password } = req.body;
+
+    // Check if user exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        error: 'User already exists'
+      });
+    }
+
+    // Create admin user
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: 'admin'
+    });
+
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
         token
       }
     });

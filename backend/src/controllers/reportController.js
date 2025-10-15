@@ -8,13 +8,20 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 export const getDepartmentReport = async (req, res, next) => {
   try {
     const { departmentId } = req.query;
+    const user = req.user;
 
-    const matchStage = departmentId
-      ? { $match: { department: new mongoose.Types.ObjectId(departmentId) } }
-      : { $match: {} };
+    let filterQuery = {};
+
+    // If user is department officer, restrict to their department
+    if (user.role === 'department-officer') {
+      filterQuery.department = user.department;
+    } else if (departmentId) {
+      // Admin can filter by department
+      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+    }
 
     // Instead of grouping by department, return detailed assets with populated department info
-    const assets = await Asset.find(matchStage.$match)
+    const assets = await Asset.find(filterQuery)
       .populate('department', 'name')
       .lean()
       .sort({ billDate: -1 });
@@ -503,10 +510,15 @@ export const exportWord = async (req, res, next) => {
 export const getCombinedReport = async (req, res, next) => {
   try {
     const { departmentId, type, startDate, endDate } = req.query;
+    const user = req.user;
 
     const filterQuery = {};
 
-    if (departmentId) {
+    // If user is department officer, restrict to their department
+    if (user.role === 'department-officer') {
+      filterQuery.department = user.department;
+    } else if (departmentId) {
+      // Admin can filter by department
       filterQuery.department = new mongoose.Types.ObjectId(departmentId);
     }
 

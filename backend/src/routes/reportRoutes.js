@@ -9,7 +9,7 @@ import {
   exportWord,
   getCombinedReport
 } from '../controllers/reportController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

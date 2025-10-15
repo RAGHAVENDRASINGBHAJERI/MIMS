@@ -94,8 +94,13 @@ export default function Login() {
         description: `Successfully logged in as ${userData.name}`,
         duration: 3000,
       });
-      
-      navigate('/dashboard');
+
+      // Navigate based on user role
+      if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       console.error('Error message:', error.message);

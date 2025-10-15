@@ -15,6 +15,7 @@ import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import CreateAdmin from "./pages/CreateAdmin";
 import SelectAssetType from "./pages/SelectAssetType";
 import CapitalForm from "./pages/CapitalForm";
 import RevenueForm from "./pages/RevenueForm";
@@ -42,6 +43,7 @@ const App = () => (
                     <AnimatedRoutes>
                       <Route path="/login" element={<Login />} />
                       <Route path="/register" element={<Register />} />
+                      <Route path="/create-admin" element={<CreateAdmin />} />
                       <Route path="/" element={<Landing />} />
                       <Route path="/dashboard" element={
                         <ProtectedRoute>

@@ -1,4 +1,5 @@
 import Asset from '../models/Asset.js';
+import mongoose from 'mongoose';
 import { uploadFile, downloadFile } from '../utils/gridfs.js';
 import multer from 'multer';
 
@@ -101,14 +102,54 @@ export const createAsset = async (req, res, next) => {
 
 export const getAssets = async (req, res, next) => {
   try {
-    const assets = await Asset.find()
-      .populate('department', 'name type')
-      .sort({ createdAt: -1 });
+    const { departmentId, type, startDate, endDate, page = 1, limit = 10 } = req.query;
+    const user = req.user;
+
+    const filterQuery = {};
+
+    // If user is department officer, restrict to their department
+    if (user.role === 'department-officer') {
+      filterQuery.department = user.department;
+    } else if (departmentId) {
+      // Admin can filter by department
+      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+    }
+
+    if (type) {
+      filterQuery.type = type;
+    }
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
+    }
+
+    const skip = (page - 1) * limit;
+    const assets = await Asset.find(filterQuery)
+      .populate('department', 'name')
+      .sort({ billDate: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalAssets = await Asset.countDocuments(filterQuery);
+    const totalPages = Math.ceil(totalAssets / limit);
 
     res.json({
       success: true,
-      count: assets.length,
-      data: assets
+      data: {
+        assets,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalAssets,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      }
     });
   } catch (error) {
     next(error);

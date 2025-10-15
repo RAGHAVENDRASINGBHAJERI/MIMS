@@ -48,16 +48,27 @@ export interface AssetFormData {
 
 export interface AssetListResponse {
   assets: Asset[];
-  totalCount: number;
-  currentPage: number;
-  totalPages: number;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalAssets: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 const API_BASE_URL = 'http://localhost:5000';
 
 export const assetService = {
   // Get all assets
-  getAssets: async (): Promise<Asset[]> => {
+  getAssets: async (params?: {
+    departmentId?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<AssetListResponse> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -66,7 +77,17 @@ export const assetService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/assets`, { headers });
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const url = `${API_BASE_URL}/api/assets${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await fetch(url, { headers });
     const result = await response.json();
 
     if (!response.ok) {

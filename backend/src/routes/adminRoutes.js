@@ -11,7 +11,7 @@ const router = express.Router();
 
 // All admin routes require authentication and admin role
 router.use(protect);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'chief-administrative-officer'));
 
 // User management routes
 router.route('/users')
