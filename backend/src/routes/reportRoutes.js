@@ -7,6 +7,7 @@ import {
   getYearReport,
   exportExcel,
   exportWord,
+  exportBillsZip,
   getCombinedReport
 } from '../controllers/reportController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -33,5 +34,8 @@ router.get('/export/excel', protect, exportExcel);
 
 // GET /api/reports/export/word - Export Word
 router.get('/export/word', protect, exportWord);
+
+// GET /api/reports/download/bills - Download bills as ZIP
+router.get('/download/bills', protect, exportBillsZip);
 
 export default router;

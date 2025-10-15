@@ -20,6 +20,23 @@ import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, Save, Calculator, FileText, User, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const containerVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+  hover: { scale: 1.05 },
+};
+
 const assetSchema = z.object({
   itemName: z.string().min(1, 'Item name is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
@@ -43,7 +60,7 @@ const assetSchema = z.object({
 
 type AssetFormValues = z.infer<typeof assetSchema>;
 
-export default function CapitalForm() {
+export default function ConsumableForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { state, dispatch } = useAssetFlow();
@@ -59,15 +76,12 @@ export default function CapitalForm() {
     formState: { errors, isValid }
   } = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
-    mode: 'onChange'
+    mode: 'onChange',
   });
 
   const quantity = watch('quantity') || 0;
   const pricePerItem = watch('pricePerItem') || 0;
-  const cgst = watch('cgst') || 0;
-  const sgst = watch('sgst') || 0;
   const totalAmount = quantity * pricePerItem;
-  const grandTotal = totalAmount + (totalAmount * cgst / 100) + (totalAmount * sgst / 100);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +90,7 @@ export default function CapitalForm() {
 
         const [departments, categories] = await Promise.all([
           departmentService.getAllDepartments(),
-          categoryService.getAllCategories('capital')
+          categoryService.getAllCategories('consumable')
         ]);
 
         dispatch({ type: 'SET_DEPARTMENTS', payload: departments });
@@ -99,7 +113,7 @@ export default function CapitalForm() {
     };
 
     fetchData();
-  }, [dispatch, toast, user, setValue]);
+  }, [dispatch, toast]);
 
   const onSubmit = async (data: AssetFormValues) => {
     if (!selectedFile) {
@@ -125,26 +139,26 @@ export default function CapitalForm() {
         billDate: data.billDate,
         department: data.department,
         category: data.category,
-        type: 'capital',
+        type: 'consumable',
         billFile: selectedFile,
         collegeISRNo: data.collegeISRNo,
         itISRNo: data.itISRNo,
         igst: data.igst,
         cgst: data.cgst,
         sgst: data.sgst,
-        grandTotal: grandTotal,
+        grandTotal: data.grandTotal,
         remark: data.remark,
       };
 
       console.log('Asset data to send:', assetData);
       const newAsset = await assetService.createAsset(assetData);
       console.log('Created asset:', newAsset);
-      
+
       dispatch({ type: 'ADD_ASSET', payload: newAsset });
-      
+
       toast({
         title: 'Success',
-        description: 'Capital asset added successfully',
+        description: 'Consumable asset added successfully',
       });
 
       navigate('/');
@@ -152,7 +166,7 @@ export default function CapitalForm() {
       console.error('Error creating asset:', error);
       toast({
         title: 'Error',
-        description: 'Failed to add capital asset. Please try again.',
+        description: 'Failed to add consumable asset. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -191,28 +205,28 @@ export default function CapitalForm() {
               Back to Dashboard
             </Button>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             className="mb-2"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <motion.h1 
+            <motion.h1
               className="text-3xl font-bold text-gray-800"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              Add New Material
+              Add New Consumable
             </motion.h1>
-            <motion.p 
+            <motion.p
               className="text-gray-600"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.5 }}
             >
-              Create a new material inward record
+              Create a new consumable inward record
             </motion.p>
           </motion.div>
         </motion.div>
@@ -269,7 +283,7 @@ export default function CapitalForm() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">Item Details</h3>
-                  <p className="text-sm text-gray-600">Detailed information about the material.</p>
+                  <p className="text-sm text-gray-600">Detailed information about the consumable.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -305,7 +319,7 @@ export default function CapitalForm() {
                     Item Category *
                   </Label>
                   <Select onValueChange={(value) => setValue('category', value)}>
-                    <SelectTrigger 
+                    <SelectTrigger
                       id="category"
                       aria-label="Select Category"
                       className="mt-1"
@@ -341,8 +355,8 @@ export default function CapitalForm() {
                   label="Quantity *"
                   type="number"
                   placeholder="Enter quantity"
-                  {...register('quantity', { 
-                    required: true, 
+                  {...register('quantity', {
+                    required: true,
                     valueAsNumber: true,
                     min: { value: 1, message: 'Quantity must be at least 1' }
                   })}
@@ -354,8 +368,8 @@ export default function CapitalForm() {
                   type="number"
                   step="0.01"
                   placeholder="Enter cost per item"
-                  {...register('pricePerItem', { 
-                    required: true, 
+                  {...register('pricePerItem', {
+                    required: true,
                     valueAsNumber: true,
                     min: { value: 0, message: 'Price must be positive' }
                   })}
@@ -494,9 +508,9 @@ export default function CapitalForm() {
                   label="Grand Total (₹)"
                   type="number"
                   step="0.01"
-                  value={grandTotal}
-                  readOnly
-                  className="bg-gray-50"
+                  placeholder="Enter grand total"
+                  {...register('grandTotal', { valueAsNumber: true })}
+                  error={errors.grandTotal?.message}
                 />
               </div>
             </motion.div>
@@ -557,7 +571,7 @@ export default function CapitalForm() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
+              transition={{ delay: 0.6 }}
               className="flex justify-end gap-4 pt-6 border-t border-gray-200"
             >
               <Button
@@ -578,7 +592,7 @@ export default function CapitalForm() {
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Save Material
+                    Save Consumable
                   </>
                 )}
               </Button>

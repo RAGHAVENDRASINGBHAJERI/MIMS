@@ -1,590 +1,942 @@
-
 import Asset from '../models/Asset.js';
 import Department from '../models/Department.js';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx';
+import JSZip from 'jszip';
+import { getGridFS } from '../utils/gridfs.js';
 
-export const getDepartmentReport = async (req, res, next) => {
-  try {
-    const { departmentId } = req.query;
-    const user = req.user;
-
+/**
+ * Helper function to build the base filter query from request query and user role.
+ * This ensures consistent filtering across all report and export functions.
+ */
+const buildFilterQuery = (user, query) => {
+    const { departmentId, vendorName, itemName, startDate, endDate } = query;
     let filterQuery = {};
 
-    // If user is department officer, restrict to their department
+    // 1. Apply user role restrictions
     if (user.role === 'department-officer') {
-      filterQuery.department = user.department;
+        // Department Officer can only see assets from their assigned department
+        filterQuery.department = user.department;
     } else if (departmentId) {
-      // Admin can filter by department
-      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
-    }
-
-    // Instead of grouping by department, return detailed assets with populated department info
-    const assets = await Asset.find(filterQuery)
-      .populate('department', 'name')
-      .lean()
-      .sort({ billDate: -1 });
-
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
-    const grandTotal = totalCapital + totalRevenue;
-
-    res.json({
-      success: true,
-      data: {
-        assets,
-        totalCapital,
-        totalRevenue,
-        grandTotal,
-        itemCount: assets.length
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getVendorReport = async (req, res, next) => {
-  try {
-    const { vendorName } = req.query;
-    const user = req.user;
-
-    const matchStage = vendorName
-      ? { $match: { vendorName: { $regex: new RegExp(vendorName, 'i') } } }
-      : { $match: {} };
-
-    // If user is department officer, restrict to their department
-    if (user.role === 'department-officer') {
-      matchStage.$match.department = user.department;
-    }
-
-    const report = await Asset.aggregate([
-      matchStage,
-      {
-        $group: {
-          _id: '$vendorName',
-          totalAssets: { $sum: 1 },
-          totalAmount: { $sum: '$totalAmount' },
-          vendorDetails: { $first: { address: '$vendorAddress', contact: '$contactNumber', email: '$email' } }
+        // Admin/Principal can filter by department
+        // Ensure departmentId is a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(departmentId)) {
+            filterQuery.department = new mongoose.Types.ObjectId(departmentId);
         }
-      },
-      {
-        $sort: { totalAmount: -1 }
-      }
-    ]);
-
-    const grandTotal = report.reduce((sum, vendor) => sum + vendor.totalAmount, 0);
-
-    res.json({
-      success: true,
-      data: {
-        report,
-        grandTotal,
-        totalVendors: report.length
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getItemReport = async (req, res, next) => {
-  try {
-    const { itemName } = req.query;
-    const user = req.user;
-
-    const filterQuery = {};
-    if (itemName) {
-      filterQuery.itemName = { $regex: new RegExp(itemName, 'i') };
     }
 
-    // If user is department officer, restrict to their department
-    if (user.role === 'department-officer') {
-      filterQuery.department = user.department;
-    }
-
-    const report = await Asset.find(filterQuery)
-      .populate('department', 'name')
-      .lean()
-      .sort({ billDate: -1 });
-
-    const grandTotal = report.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
-
-    res.json({
-      success: true,
-      data: {
-        report,
-        grandTotal,
-        totalItems: report.length
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getYearReport = async (req, res, next) => {
-  try {
-    const user = req.user;
-
-    const matchStage = {};
-
-    // If user is department officer, restrict to their department
-    if (user.role === 'department-officer') {
-      matchStage.department = user.department;
-    }
-
-    const report = await Asset.aggregate([
-      { $match: matchStage },
-      {
-        $addFields: {
-          calendarYear: { $year: '$billDate' }
-        }
-      },
-      {
-        $group: {
-          _id: '$calendarYear',
-          totalAssets: { $sum: 1 },
-          totalAmount: { $sum: '$totalAmount' }
-        }
-      },
-      {
-        $sort: { _id: -1 }
-      }
-    ]);
-
-    const grandTotal = report.reduce((sum, year) => sum + year.totalAmount, 0);
-
-    res.json({
-      success: true,
-      data: {
-        report,
-        grandTotal,
-        totalYears: report.length
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const exportExcel = async (req, res, next) => {
-  try {
-    const { type, departmentId, vendorName, itemName, startDate, endDate } = req.query;
-    const user = req.user;
-
-    let filterQuery = {};
-
-    // Apply user role restrictions
-    if (user.role === 'department-officer') {
-      filterQuery.department = user.department;
-    } else if (departmentId) {
-      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
-    }
-
-    // Apply filters
+    // 2. Apply query filters
     if (vendorName) {
-      filterQuery.vendorName = { $regex: new RegExp(vendorName, 'i') };
+        filterQuery.vendorName = { $regex: new RegExp(vendorName, 'i') };
     }
     if (itemName) {
-      filterQuery.itemName = { $regex: new RegExp(itemName, 'i') };
+        filterQuery.itemName = { $regex: new RegExp(itemName, 'i') };
     }
     if (startDate || endDate) {
-      filterQuery.billDate = {};
-      if (startDate) filterQuery.billDate.$gte = new Date(startDate);
-      if (endDate) filterQuery.billDate.$lte = new Date(endDate);
+        filterQuery.billDate = {};
+        if (startDate) filterQuery.billDate.$gte = new Date(startDate);
+        if (endDate) filterQuery.billDate.$lte = new Date(endDate);
     }
 
-    let report = [];
-    let filename = '';
-
-    switch (type) {
-      case 'department': {
-        const matchStage = { $match: filterQuery };
-        report = await Asset.aggregate([
-          { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
-          { $unwind: '$dept' },
-          matchStage,
-          { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 }, totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } }, totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } } } },
-          { $sort: { totalAmount: -1 } }
-        ]);
-        report = report.map(item => ({
-          departmentName: item._id,
-          totalAmount: item.totalAmount,
-          count: item.count,
-          totalCapital: item.totalCapital,
-          totalRevenue: item.totalRevenue
-        }));
-        filename = 'department_report.xlsx';
-        break;
-      }
-      case 'vendor': {
-        const matchStage = { $match: filterQuery };
-        report = await Asset.aggregate([
-          matchStage,
-          { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
-          { $sort: { totalAmount: -1 } }
-        ]);
-        filename = 'vendor_report.xlsx';
-        break;
-      }
-      case 'year':
-        const matchStage = { $match: filterQuery };
-        report = await Asset.aggregate([
-          matchStage,
-          {
-            $addFields: {
-              calendarYear: { $year: '$billDate' }
-            }
-          },
-          {
-            $group: {
-              _id: '$calendarYear',
-              totalAssets: { $sum: 1 },
-              totalAmount: { $sum: '$totalAmount' }
-            }
-          },
-          {
-            $sort: { _id: -1 }
-          }
-        ]);
-        filename = 'year_report.xlsx';
-        break;
-      default:
-        report = await Asset.find(filterQuery)
-          .populate('department', 'name')
-          .lean()
-          .sort({ billDate: -1 });
-        filename = 'assets_report.xlsx';
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Report');
-
-    // Add headers
-    if (type === 'department') {
-      worksheet.columns = [
-        { header: 'Department', key: 'departmentName', width: 30 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 },
-        { header: 'Asset Count', key: 'count', width: 15 }
-      ];
-    } else if (type === 'vendor') {
-      worksheet.columns = [
-        { header: 'Vendor', key: '_id', width: 30 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 },
-        { header: 'Asset Count', key: 'count', width: 15 }
-      ];
-    } else if (type === 'year') {
-      worksheet.columns = [
-        { header: 'Year', key: '_id', width: 15 },
-        { header: 'Total Assets', key: 'totalAssets', width: 15 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 }
-      ];
-    } else {
-      worksheet.columns = [
-        { header: 'Sl No.', key: 'slNo', width: 10 },
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'College ISR No.', key: 'collegeISRNo', width: 20 },
-        { header: 'IT ISR No.', key: 'itISRNo', width: 20 },
-        { header: 'Particulars', key: 'particulars', width: 30 },
-        { header: 'Vendor', key: 'vendor', width: 25 },
-        { header: 'Bill Date', key: 'billDate', width: 15 },
-        { header: 'Bill No.', key: 'billNo', width: 20 },
-        { header: 'Quantity', key: 'quantity', width: 15 },
-        { header: 'Rate', key: 'rate', width: 15 },
-        { header: 'Amount', key: 'amount', width: 15 },
-        { header: 'CGST', key: 'cgst', width: 10 },
-        { header: 'SGST', key: 'sgst', width: 10 },
-        { header: 'Grand Total', key: 'grandTotal', width: 15 },
-        { header: 'Remark', key: 'remark', width: 25 }
-      ];
-    }
-
-    // Map report data to flat objects for Excel rows
-    const rows = report.map((item, index) => {
-      if (type === 'vendor') {
-        return {
-          _id: item._id || '',
-          totalAmount: item.totalAmount || '',
-          count: item.count || ''
-        };
-      } else if (type === 'year') {
-        return {
-          _id: item._id || '',
-          totalAssets: item.totalAssets || '',
-          totalAmount: item.totalAmount || ''
-        };
-      } else if (type === 'department') {
-        return {
-          departmentName: item.departmentName || '',
-          totalAmount: item.totalAmount || '',
-          count: item.count || ''
-        };
-      }
-      return {
-        slNo: index + 1,
-        date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
-        collegeISRNo: item.collegeISRNo || '',
-        itISRNo: item.itISRNo || '',
-        particulars: item.itemName || '',
-        vendor: item.vendorName || '',
-        billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-        billNo: item.billNo || '',
-        quantity: item.quantity || '',
-        rate: item.pricePerItem || '',
-        amount: item.totalAmount || '',
-        cgst: item.cgst || '',
-        sgst: item.sgst || '',
-        grandTotal: item.grandTotal || '',
-        remark: item.remark || ''
-      };
-    });
-
-    worksheet.addRows(rows);
-
-    // For combined report, add total row at the bottom
-    if (type === undefined || type === 'all' || type === '') {
-      const totalAmount = report.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
-      worksheet.addRow({
-        slNo: '',
-        date: '',
-        collegeISRNo: '',
-        itISRNo: '',
-        particulars: 'Total',
-        vendor: '',
-        billDate: '',
-        billNo: '',
-        quantity: '',
-        rate: '',
-        amount: totalAmount,
-        cgst: '',
-        sgst: '',
-        grandTotal: '',
-        remark: ''
-      });
-    }
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (error) {
-    next(error);
-  }
+    return filterQuery;
 };
 
-export const exportWord = async (req, res, next) => {
-  try {
-    const { type } = req.query;
-    let report = [];
-    let summary = null;
-    let filename = '';
+// --- Report Generation APIs ---
 
-    switch (type) {
-      case 'department':
-        report = await Asset.aggregate([
-          { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
-          { $unwind: '$dept' },
-          { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
-          { $sort: { totalAmount: -1 } }
-        ]);
-        filename = 'department_report.docx';
-        break;
-      case 'year':
-        report = await Asset.aggregate([
-          {
-            $addFields: {
-              calendarYear: { $year: '$billDate' }
-            }
-          },
-          {
-            $group: {
-              _id: '$calendarYear',
-              totalAssets: { $sum: 1 },
-              totalAmount: { $sum: '$totalAmount' }
-            }
-          },
-          {
-            $sort: { _id: -1 }
-          }
-        ]);
-        filename = 'year_report.docx';
-        break;
-      default:
-        report = await Asset.find()
-          .populate('department', 'name')
-          .lean()
-          .sort({ billDate: -1 });
+/**
+ * Groups assets by department with type breakdowns.
+ */
+export const getDepartmentReport = async (req, res, next) => {
+    try {
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query);
 
-        // Calculate summary for combined report
+        const matchStage = { $match: filterQuery };
+
+        const report = await Asset.aggregate([
+            matchStage,
+            {
+                $lookup: {
+                    from: 'departments',
+                    localField: 'department',
+                    foreignField: '_id',
+                    as: 'dept'
+                }
+            },
+            {
+                $unwind: { path: '$dept', preserveNullAndEmptyArrays: true }
+            },
+            {
+                $group: {
+                    _id: '$dept.name',
+                    totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                    totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                    totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                    totalAmount: { $sum: '$totalAmount' },
+                    itemCount: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ]);
+
+        const totalCapital = report.reduce((sum, dept) => sum + dept.totalCapital, 0);
+        const totalRevenue = report.reduce((sum, dept) => sum + dept.totalRevenue, 0);
+        const totalConsumable = report.reduce((sum, dept) => sum + dept.totalConsumable, 0);
+        const grandTotal = totalCapital + totalRevenue + totalConsumable;
+        const itemCount = report.reduce((sum, dept) => sum + dept.itemCount, 0);
+
+        res.json({
+            success: true,
+            data: {
+                report,
+                summary: {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Groups assets by vendor with type breakdowns and contact details.
+ */
+export const getVendorReport = async (req, res, next) => {
+    try {
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query);
+
+        const matchStage = { $match: filterQuery };
+
+        const report = await Asset.aggregate([
+            matchStage,
+            {
+                $group: {
+                    _id: '$vendorName',
+                    totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                    totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                    totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                    totalAmount: { $sum: '$totalAmount' },
+                    totalAssets: { $sum: 1 },
+                    vendorDetails: {
+                        $first: {
+                            address: '$vendorAddress',
+                            contact: '$contactNumber',
+                            email: '$email'
+                        }
+                    }
+                }
+            },
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ]);
+
+        const totalCapital = report.reduce((sum, vendor) => sum + vendor.totalCapital, 0);
+        const totalRevenue = report.reduce((sum, vendor) => sum + vendor.totalRevenue, 0);
+        const totalConsumable = report.reduce((sum, vendor) => sum + vendor.totalConsumable, 0);
+        const grandTotal = totalCapital + totalRevenue + totalConsumable;
+        const itemCount = report.reduce((sum, vendor) => sum + vendor.totalAssets, 0);
+
+        res.json({
+            success: true,
+            data: {
+                report,
+                summary: {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Fetches detailed assets filtered by item name with summary.
+ */
+export const getItemReport = async (req, res, next) => {
+    try {
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query);
+
+        const report = await Asset.find(filterQuery)
+            .populate('department', 'name')
+            .lean()
+            .sort({ billDate: -1 });
+
         const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
         const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
-        const grandTotal = totalCapital + totalRevenue;
+        const totalConsumable = report.reduce((sum, asset) => sum + (asset.type === 'consumable' ? (asset.totalAmount || 0) : 0), 0);
+        const grandTotal = totalCapital + totalRevenue + totalConsumable;
         const itemCount = report.length;
 
-        summary = {
-          totalCapital,
-          totalRevenue,
-          grandTotal,
-          itemCount
-        };
-
-        filename = 'assets_report.docx';
+        res.json({
+            success: true,
+            data: {
+                report,
+                summary: {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
     }
-
-    const children = [
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `AssetFlow ${type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Assets'} Report`,
-            bold: true,
-            size: 32
-          })
-        ]
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `Generated on: ${new Date().toLocaleDateString()}`,
-            size: 24
-          })
-        ]
-      })
-    ];
-
-    // Add summary for combined report
-    if (summary) {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: 'Summary:',
-              bold: true,
-              size: 24
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Total Capital Assets: ₹${summary.totalCapital.toLocaleString()}`,
-              size: 20
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Total Revenue Assets: ₹${summary.totalRevenue.toLocaleString()}`,
-              size: 20
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Grand Total: ₹${summary.grandTotal.toLocaleString()}`,
-              size: 20
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `Total Items: ${summary.itemCount}`,
-              size: 20
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: '',
-              size: 20
-            })
-          ]
-        })
-      );
-    }
-
-    // Add report items
-    children.push(...report.map(item => new Paragraph({
-      children: [
-        new TextRun({
-          text: `${item.itemName || item._id}: ₹${item.totalAmount || 0} (${item.count || 1} items) - Department: ${item.department?.name || 'N/A'} - Category: ${item.category || 'N/A'} - Quantity: ${item.quantity || 'N/A'} - Price Per Item: ${item.pricePerItem || 'N/A'} - Vendor: ${item.vendorName || 'N/A'} - Bill No: ${item.billNo || 'N/A'} - Bill Date: ${item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'} - Academic Year: ${item.academicYear || 'N/A'}`,
-          size: 20
-        })
-      ]
-    })));
-
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children
-      }]
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(buffer);
-  } catch (error) {
-    next(error);
-  }
 };
 
+/**
+ * Groups assets by academic year (assuming academicYear field exists; otherwise use calendar year).
+ * Note: Asset model does not have academicYear field; using calendar year from billDate.
+ */
+export const getYearReport = async (req, res, next) => {
+    try {
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query);
+        const matchStage = { $match: filterQuery };
+
+        const report = await Asset.aggregate([
+            matchStage,
+            {
+                $addFields: {
+                    year: { $year: '$billDate' } // Use calendar year; replace with '$academicYear' if field exists
+                }
+            },
+            {
+                $group: {
+                    _id: '$year',
+                    totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                    totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                    totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                    totalAmount: { $sum: '$totalAmount' },
+                    totalAssets: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { _id: -1 }
+            }
+        ]);
+
+        const totalCapital = report.reduce((sum, year) => sum + year.totalCapital, 0);
+        const totalRevenue = report.reduce((sum, year) => sum + year.totalRevenue, 0);
+        const totalConsumable = report.reduce((sum, year) => sum + year.totalConsumable, 0);
+        const grandTotal = totalCapital + totalRevenue + totalConsumable;
+        const itemCount = report.reduce((sum, year) => sum + year.totalAssets, 0);
+
+        res.json({
+            success: true,
+            data: {
+                report,
+                summary: {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Provides an overall summary of assets based on filters (used by the dashboard).
+ */
 export const getCombinedReport = async (req, res, next) => {
-  try {
-    const { departmentId, type, startDate, endDate } = req.query;
-    const user = req.user;
+    try {
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query);
 
-    const filterQuery = {};
+        const assets = await Asset.find(filterQuery).populate('department', 'name').lean();
 
-    // If user is department officer, restrict to their department
-    if (user.role === 'department-officer') {
-      filterQuery.department = user.department;
-    } else if (departmentId) {
-      // Admin can filter by department
-      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+        const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
+        const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
+        const totalConsumable = assets.reduce((sum, asset) => sum + (asset.type === 'consumable' ? (asset.totalAmount || 0) : 0), 0);
+        const grandTotal = totalCapital + totalRevenue + totalConsumable;
+        const itemCount = assets.length;
+
+        res.json({
+            success: true,
+            data: {
+                summary: {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                },
+                assets // Optionally return assets, useful for a combined view
+            }
+        });
+    } catch (error) {
+        next(error);
     }
+};
 
-    if (type) {
-      filterQuery.type = type;
+// --- Export Functions ---
+
+/**
+ * Exports report data to an Excel file.
+ */
+export const exportExcel = async (req, res, next) => {
+    try {
+        const { type } = req.query;
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query); // Use consistent filter logic
+
+        let report = [];
+        let filename = '';
+
+        switch (type) {
+            case 'department': {
+                const matchStage = { $match: filterQuery };
+                report = await Asset.aggregate([
+                    matchStage,
+                    { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
+                    { $unwind: { path: '$dept', preserveNullAndEmptyArrays: true } },
+                    { $group: {
+                        _id: '$dept.name',
+                        totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                        totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                        totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                        totalAmount: { $sum: '$totalAmount' },
+                        itemCount: { $sum: 1 }
+                    } },
+                    { $sort: { totalAmount: -1 } }
+                ]);
+                filename = 'department_report.xlsx';
+                break;
+            }
+            case 'vendor': {
+                const matchStage = { $match: filterQuery };
+                report = await Asset.aggregate([
+                    matchStage,
+                    { $group: {
+                        _id: '$vendorName',
+                        totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                        totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                        totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                        totalAmount: { $sum: '$totalAmount' },
+                        totalAssets: { $sum: 1 },
+                        vendorDetails: {
+                            $first: {
+                                address: '$vendorAddress',
+                                contact: '$contactNumber',
+                                email: '$email'
+                            }
+                        }
+                    } },
+                    { $sort: { totalAmount: -1 } }
+                ]);
+                filename = 'vendor_report.xlsx';
+                break;
+            }
+            case 'year': {
+                const matchStage = { $match: filterQuery };
+                report = await Asset.aggregate([
+                    matchStage,
+                    {
+                        $addFields: {
+                            year: { $year: '$billDate' } // Use calendar year; replace with '$academicYear' if field exists
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$year',
+                            totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+                            totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } },
+                            totalConsumable: { $sum: { $cond: [{ $eq: ['$type', 'consumable'] }, '$totalAmount', 0] } },
+                            totalAmount: { $sum: '$totalAmount' },
+                            totalAssets: { $sum: 1 }
+                        }
+                    },
+                    {
+                        $sort: { _id: -1 }
+                    }
+                ]);
+                filename = 'year_report.xlsx';
+                break;
+            }
+            default: // Default/All Assets/Item Report
+                report = await Asset.find(filterQuery)
+                    .populate('department', 'name')
+                    .lean()
+                    .sort({ billDate: -1 });
+                filename = 'assets_report.xlsx';
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Report');
+
+        // Add headers
+        if (type === 'department') {
+            worksheet.columns = [
+                { header: 'Department', key: 'departmentName', width: 30 },
+                { header: 'Total Capital', key: 'totalCapital', width: 18 },
+                { header: 'Total Revenue', key: 'totalRevenue', width: 18 },
+                { header: 'Total Consumable', key: 'totalConsumable', width: 18 },
+                { header: 'Total Amount', key: 'totalAmount', width: 18 },
+                { header: 'Asset Count', key: 'itemCount', width: 15 }
+            ];
+        } else if (type === 'vendor') {
+            worksheet.columns = [
+                { header: 'Vendor', key: '_id', width: 30 },
+                { header: 'Total Capital', key: 'totalCapital', width: 18 },
+                { header: 'Total Revenue', key: 'totalRevenue', width: 18 },
+                { header: 'Total Consumable', key: 'totalConsumable', width: 18 },
+                { header: 'Total Amount', key: 'totalAmount', width: 18 },
+                { header: 'Asset Count', key: 'totalAssets', width: 15 },
+                { header: 'Contact', key: 'contact', width: 20 },
+                { header: 'Email', key: 'email', width: 25 }
+            ];
+        } else if (type === 'year') {
+            worksheet.columns = [
+                { header: 'Year', key: '_id', width: 15 },
+                { header: 'Total Capital', key: 'totalCapital', width: 18 },
+                { header: 'Total Revenue', key: 'totalRevenue', width: 18 },
+                { header: 'Total Consumable', key: 'totalConsumable', width: 18 },
+                { header: 'Total Amount', key: 'totalAmount', width: 18 },
+                { header: 'Total Assets', key: 'totalAssets', width: 15 }
+            ];
+        } else { // Default/All Assets report
+            worksheet.columns = [
+                { header: 'Sl No.', key: 'slNo', width: 10 },
+                { header: 'Department', key: 'departmentName', width: 25 },
+                { header: 'Date Created', key: 'date', width: 15 },
+                { header: 'College ISR No.', key: 'collegeISRNo', width: 20 },
+                { header: 'IT ISR No.', key: 'itISRNo', width: 20 },
+                { header: 'Item Name/Particulars', key: 'particulars', width: 35 },
+                { header: 'Vendor', key: 'vendor', width: 25 },
+                { header: 'Bill Date', key: 'billDate', width: 15 },
+                { header: 'Bill No.', key: 'billNo', width: 20 },
+                { header: 'Quantity', key: 'quantity', width: 15 },
+                { header: 'Rate (Per Item)', key: 'rate', width: 15 },
+                { header: 'Sub Total (Amt)', key: 'amount', width: 15 },
+                { header: 'CGST', key: 'cgst', width: 10 },
+                { header: 'SGST', key: 'sgst', width: 10 },
+                { header: 'Total Amount', key: 'totalAmount', width: 18 },
+                { header: 'Asset Type', key: 'assetType', width: 15 },
+                { header: 'Remark', key: 'remark', width: 25 }
+            ];
+        }
+
+        // Map report data to flat objects for Excel rows
+        const rows = report.map((item, index) => {
+            if (type === 'department') {
+                return {
+                    departmentName: item._id || 'Unassigned',
+                    totalCapital: item.totalCapital,
+                    totalRevenue: item.totalRevenue,
+                    totalConsumable: item.totalConsumable,
+                    totalAmount: item.totalAmount,
+                    itemCount: item.itemCount
+                };
+            } else if (type === 'vendor') {
+                return {
+                    _id: item._id,
+                    totalCapital: item.totalCapital,
+                    totalRevenue: item.totalRevenue,
+                    totalConsumable: item.totalConsumable,
+                    totalAmount: item.totalAmount,
+                    totalAssets: item.totalAssets,
+                    contact: item.vendorDetails?.contact || '',
+                    email: item.vendorDetails?.email || ''
+                };
+            } else if (type === 'year') {
+                return item;
+            } else {
+                // Detailed Asset Report mapping
+                return {
+                    slNo: index + 1,
+                    departmentName: item.department?.name || 'N/A',
+                    date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+                    collegeISRNo: item.collegeISRNo || '',
+                    itISRNo: item.itISRNo || '',
+                    particulars: item.itemName || '',
+                    vendor: item.vendorName || '',
+                    billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
+                    billNo: item.billNo || '',
+                    quantity: item.quantity || '',
+                    rate: item.pricePerItem || '',
+                    amount: (item.quantity * item.pricePerItem) || '',
+                    cgst: item.cgst || '',
+                    sgst: item.sgst || '',
+                    totalAmount: item.totalAmount || '',
+                    assetType: item.type || '',
+                    remark: item.remark || ''
+                };
+            }
+        });
+
+        worksheet.addRows(rows);
+
+        // Add TOTAL row for all report types
+        if (type === 'department') {
+            const totalCapital = report.reduce((sum, item) => sum + item.totalCapital, 0);
+            const totalRevenue = report.reduce((sum, item) => sum + item.totalRevenue, 0);
+            const totalConsumable = report.reduce((sum, item) => sum + item.totalConsumable, 0);
+            const totalAmount = report.reduce((sum, item) => sum + item.totalAmount, 0);
+            const itemCount = report.reduce((sum, item) => sum + item.itemCount, 0);
+            worksheet.addRow({
+                departmentName: 'TOTAL',
+                totalCapital: { value: totalCapital, numFmt: '0.00' },
+                totalRevenue: { value: totalRevenue, numFmt: '0.00' },
+                totalConsumable: { value: totalConsumable, numFmt: '0.00' },
+                totalAmount: { value: totalAmount, numFmt: '0.00' },
+                itemCount: itemCount
+            });
+        } else if (type === 'vendor') {
+            const totalCapital = report.reduce((sum, item) => sum + item.totalCapital, 0);
+            const totalRevenue = report.reduce((sum, item) => sum + item.totalRevenue, 0);
+            const totalConsumable = report.reduce((sum, item) => sum + item.totalConsumable, 0);
+            const totalAmount = report.reduce((sum, item) => sum + item.totalAmount, 0);
+            const totalAssets = report.reduce((sum, item) => sum + item.totalAssets, 0);
+            worksheet.addRow({
+                _id: 'TOTAL',
+                totalCapital: { value: totalCapital, numFmt: '0.00' },
+                totalRevenue: { value: totalRevenue, numFmt: '0.00' },
+                totalConsumable: { value: totalConsumable, numFmt: '0.00' },
+                totalAmount: { value: totalAmount, numFmt: '0.00' },
+                totalAssets: totalAssets
+            });
+        } else if (type === 'year') {
+            const totalCapital = report.reduce((sum, item) => sum + item.totalCapital, 0);
+            const totalRevenue = report.reduce((sum, item) => sum + item.totalRevenue, 0);
+            const totalConsumable = report.reduce((sum, item) => sum + item.totalConsumable, 0);
+            const totalAmount = report.reduce((sum, item) => sum + item.totalAmount, 0);
+            const totalAssets = report.reduce((sum, item) => sum + item.totalAssets, 0);
+            worksheet.addRow({
+                _id: 'TOTAL',
+                totalCapital: { value: totalCapital, numFmt: '0.00' },
+                totalRevenue: { value: totalRevenue, numFmt: '0.00' },
+                totalConsumable: { value: totalConsumable, numFmt: '0.00' },
+                totalAmount: { value: totalAmount, numFmt: '0.00' },
+                totalAssets: totalAssets
+            });
+        } else {
+            // Detailed report TOTAL
+            const totalAmount = report.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+            worksheet.addRow({
+                slNo: '',
+                departmentName: '',
+                date: '',
+                collegeISRNo: '',
+                itISRNo: '',
+                particulars: 'GRAND TOTAL',
+                vendor: '',
+                billDate: '',
+                billNo: '',
+                quantity: '',
+                rate: '',
+                amount: '',
+                cgst: '',
+                sgst: '',
+                totalAmount: { value: totalAmount, numFmt: '0.00' },
+                assetType: '',
+                remark: ''
+            });
+        }
+
+        // Style the total row
+        const totalRow = worksheet.lastRow;
+        totalRow.eachCell(cell => {
+            cell.font = { bold: true };
+            cell.border = { top: { style: 'thin' } };
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
     }
+};
 
-    if (startDate || endDate) {
-      filterQuery.billDate = {};
-      if (startDate) {
-        filterQuery.billDate.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filterQuery.billDate.$lte = new Date(endDate);
-      }
+/**
+ * Exports report data to a Word file.
+ */
+export const exportWord = async (req, res, next) => {
+    try {
+        const { type } = req.query;
+        const user = req.user;
+        const filterQuery = buildFilterQuery(user, req.query); // Added consistent filter logic
+
+        let report = [];
+        let summary = null;
+        let filename = '';
+        const matchStage = { $match: filterQuery };
+
+        switch (type) {
+            case 'department':
+                report = await Asset.aggregate([
+                    matchStage, // Apply filter
+                    { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
+                    { $unwind: { path: '$dept', preserveNullAndEmptyArrays: true } },
+                    { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+                    { $sort: { totalAmount: -1 } }
+                ]);
+                filename = 'department_report.docx';
+                break;
+            case 'vendor':
+                report = await Asset.aggregate([
+                    matchStage, // Apply filter
+                    { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+                    { $sort: { totalAmount: -1 } }
+                ]);
+                filename = 'vendor_report.docx';
+                break;
+            case 'year':
+                report = await Asset.aggregate([
+                    matchStage, // Apply filter
+                    {
+                        $addFields: {
+                            calendarYear: { $year: '$billDate' }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$calendarYear',
+                            totalAssets: { $sum: 1 },
+                            totalAmount: { $sum: '$totalAmount' }
+                        }
+                    },
+                    {
+                        $sort: { _id: -1 }
+                    }
+                ]);
+                filename = 'year_report.docx';
+                break;
+            default: // Default/All Assets/Item Report
+                report = await Asset.find(filterQuery) // Apply filter
+                    .populate('department', 'name')
+                    .lean()
+                    .sort({ billDate: -1 });
+
+                // Calculate summary for combined report
+                const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
+                const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
+                const totalConsumable = report.reduce((sum, asset) => sum + (asset.type === 'consumable' ? (asset.totalAmount || 0) : 0), 0);
+                const grandTotal = totalCapital + totalRevenue + totalConsumable;
+                const itemCount = report.length;
+
+                summary = {
+                    totalCapital,
+                    totalRevenue,
+                    totalConsumable,
+                    grandTotal,
+                    itemCount
+                };
+                filename = 'assets_report.docx';
+        }
+
+        const children = [
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new TextRun({
+                        text: `AssetFlow ${type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Detailed Assets'} Report`,
+                        bold: true,
+                        size: 40 // Larger header
+                    })
+                ]
+            }),
+            new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                    new TextRun({
+                        text: `Generated on: ${new Date().toLocaleDateString()}`,
+                        size: 24
+                    })
+                ],
+                spacing: { after: 200 } // Add space after date
+            })
+        ];
+
+        // Add summary for combined report
+        if (summary) {
+            children.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: 'Summary:',
+                            bold: true,
+                            size: 28
+                        })
+                    ]
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Total Capital Assets: ₹${summary.totalCapital.toLocaleString('en-IN')}`,
+                            size: 24
+                        })
+                    ]
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Total Revenue Assets: ₹${summary.totalRevenue.toLocaleString('en-IN')}`,
+                            size: 24
+                        })
+                    ]
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Total Consumable Assets: ₹${summary.totalConsumable.toLocaleString('en-IN')}`,
+                            size: 24
+                        })
+                    ]
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Grand Total: ₹${summary.grandTotal.toLocaleString('en-IN')}`,
+                            bold: true,
+                            size: 24
+                        })
+                    ]
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `Total Items: ${summary.itemCount}`,
+                            size: 24
+                        })
+                    ]
+                }),
+                new Paragraph({ spacing: { after: 300 } }) // Add space
+            );
+        }
+        
+        // Add report items
+        if (type === 'department' || type === 'vendor' || type === 'year') {
+            const grandTotal = report.reduce((sum, item) => sum + item.totalAmount, 0);
+
+            children.push(
+                new Table({
+                    rows: [
+                        new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: type.charAt(0).toUpperCase() + type.slice(1), bold: true })] })],
+                                    width: { size: 50, type: WidthType.PERCENTAGE }
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: 'Asset Count', bold: true })] })],
+                                    width: { size: 25, type: WidthType.PERCENTAGE }
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: 'Total Amount (₹)', bold: true })] })],
+                                    width: { size: 25, type: WidthType.PERCENTAGE }
+                                }),
+                            ],
+                        }),
+                        ...report.map(item => new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph(item._id || 'N/A')],
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph(item.count.toString())],
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph(item.totalAmount.toLocaleString('en-IN'))],
+                                }),
+                            ],
+                        })),
+                        new TableRow({
+                            children: [
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: 'GRAND TOTAL', bold: true })] })],
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: report.reduce((sum, item) => sum + item.count, 0).toString(), bold: true })] })],
+                                }),
+                                new TableCell({
+                                    children: [new Paragraph({ children: [new TextRun({ text: grandTotal.toLocaleString('en-IN'), bold: true })] })],
+                                }),
+                            ],
+                        })
+                    ],
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                })
+            );
+
+        } else {
+            // Detailed Asset Report - Improve formatting
+            children.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: 'Detailed Asset List:',
+                            bold: true,
+                            size: 28
+                        })
+                    ],
+                    spacing: { before: 300 }
+                })
+            );
+            
+            report.forEach((item, index) => {
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `${index + 1}. ${item.itemName || 'Asset'}: `, bold: true, size: 24 }),
+                            new TextRun({ text: `Type: ${item.type || 'N/A'}`, size: 24 }),
+                        ],
+                        spacing: { before: 200 }
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `Department: ${item.department?.name || 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `Vendor: ${item.vendorName || 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `Bill Date: ${item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `Bill No: ${item.billNo || 'N/A'}`, size: 20 }),
+                        ]
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `Quantity: ${item.quantity || 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `Rate: ₹${item.pricePerItem ? item.pricePerItem.toLocaleString('en-IN') : 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `Total Amount: ₹${item.totalAmount ? item.totalAmount.toLocaleString('en-IN') : 'N/A'}`, size: 20 }),
+                        ]
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `College ISR: ${item.collegeISRNo || 'N/A'} | `, size: 20 }),
+                            new TextRun({ text: `IT ISR: ${item.itISRNo || 'N/A'}`, size: 20 }),
+                        ]
+                    }),
+                    new Paragraph({
+                        children: [
+                            new TextRun({ text: `Remark: ${item.remark || 'None'}`, size: 20 }),
+                        ],
+                        spacing: { after: 200 }
+                    })
+                );
+            });
+        }
+
+
+        const doc = new Document({
+            sections: [{
+                properties: {},
+                children
+            }]
+        });
+
+        const buffer = await Packer.toBuffer(doc);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        next(error);
     }
+};
 
-    const assets = await Asset.find(filterQuery).populate('department', 'name').lean();
+/**
+ * Exports bill documents as a ZIP file.
+ */
+export const exportBillsZip = async (req, res, next) => {
+    try {
+        const { assetIds } = req.query;
+        const user = req.user;
 
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
-    const grandTotal = totalCapital + totalRevenue;
-    const itemCount = assets.length;
+        // Use the consistent filter builder logic, but manually handle assetIds for inclusion
+        const baseFilterQuery = buildFilterQuery(user, req.query); 
 
-    res.json({
-      success: true,
-      data: {
-        summary: {
-          totalCapital,
-          totalRevenue,
-          grandTotal,
-          itemCount
-        },
-        assets
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+        // Parse asset IDs
+        let selectedAssetIds = [];
+        if (assetIds) {
+            selectedAssetIds = assetIds.split(',').map(id => new mongoose.Types.ObjectId(id.trim())).filter(id => mongoose.Types.ObjectId.isValid(id));
+        }
+
+        const filterQuery = {
+            ...baseFilterQuery,
+            // Include only assets with a bill file
+            billFileId: { $exists: true, $ne: null }
+        };
+
+        // If specific asset IDs are provided, filter by them
+        if (selectedAssetIds.length > 0) {
+            filterQuery._id = { $in: selectedAssetIds };
+        }
+
+        // Fetch assets with bill files
+        const assets = await Asset.find(filterQuery)
+            .populate('department', 'name')
+            .lean();
+
+        if (assets.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No assets with bills found for the selected criteria'
+            });
+        }
+
+        const zip = new JSZip();
+        const gfs = getGridFS();
+
+        // Add each bill to the ZIP
+        for (const asset of assets) {
+            try {
+                const downloadStream = gfs.openDownloadStream(asset.billFileId);
+                const chunks = [];
+                
+                // Wait for the stream to finish and collect all data chunks
+                await new Promise((resolve, reject) => {
+                    downloadStream.on('data', chunk => chunks.push(chunk));
+                    downloadStream.on('error', reject);
+                    downloadStream.on('end', resolve);
+                });
+                
+                const buffer = Buffer.concat(chunks);
+                
+                // Create a clear and unique filename for the bill
+                const fileExtension = asset.billFileName ? asset.billFileName.split('.').pop() : 'pdf';
+                // Filename format: [ISR_No]_[Vendor]_[Bill_No].[ext]
+                const fileName = `${asset.collegeISRNo || asset.itISRNo || 'ISR_N_A'}_${asset.vendorName || 'Vendor_N_A'}_${asset.billNo || asset._id}.${fileExtension}`;
+                
+                zip.file(fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_'), buffer); // Clean filename
+            } catch (fileError) {
+                // Log and continue if a single file download fails
+                console.warn(`Failed to add bill for asset ${asset._id}:`, fileError.message);
+            }
+        }
+
+        // Generate ZIP buffer
+        const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+        // Set response headers
+        const filename = `bills_${new Date().toISOString().split('T')[0]}.zip`;
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', zipBuffer.length);
+        res.send(zipBuffer);
+
+    } catch (error) {
+        console.error('Error exporting bills ZIP:', error);
+        next(error);
+    }
 };

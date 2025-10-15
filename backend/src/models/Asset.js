@@ -13,7 +13,7 @@ const assetSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['capital', 'revenue'],
+    enum: ['capital', 'revenue', 'consumable'],
     default: 'capital'
   },
   itemName: {

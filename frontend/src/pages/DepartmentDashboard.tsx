@@ -123,7 +123,7 @@ const DepartmentDashboard = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
           >
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              {departmentName} Dashboard
+              {departmentName} 
             </h1>
             <p className="text-xl text-gray-600">
               Track and manage your department's material assets efficiently

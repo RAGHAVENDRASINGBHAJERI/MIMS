@@ -5,7 +5,7 @@ import { getDepartments, createDepartment, updateDepartment, deleteDepartment } 
 import { getAssets, createAsset, updateAsset, deleteAsset, uploadMiddleware } from '../controllers/assetController.js';
 import seedDepartments from '../../seedDepartments.js';
 import seedUsers from '../../seedUsers.js';
-import seedAssets from '../utils/seedAssets.js';
+import seedAssets from '../../seedAssets.js';
 
 const router = express.Router();
 

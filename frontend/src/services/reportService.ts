@@ -5,7 +5,7 @@ export interface ReportFilters {
   departmentId?: string;
   itemName?: string;
   vendorName?: string;
-  type?: 'capital' | 'revenue';
+  type?: 'capital' | 'revenue' | 'consumable';
   startDate?: string;
   endDate?: string;
 }
@@ -18,6 +18,7 @@ export interface ReportData {
   summary: {
     totalCapital: number;
     totalRevenue: number;
+    totalConsumable: number;
     grandTotal: number;
     itemCount: number;
   };
@@ -27,7 +28,7 @@ const API_BASE_URL = 'http://localhost:5000';
 
 export const reportService = {
   // Get department report
-  getDepartmentReport: async (filters?: ReportFilters): Promise<{ report: any[] }> => {
+  getDepartmentReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -37,9 +38,9 @@ export const reportService = {
     }
 
     const params = new URLSearchParams();
-    if (filters?.departmentId) {
-      params.append('departmentId', filters.departmentId);
-    }
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value && key !== 'academicYear') params.append(key, value);
+    });
 
     const response = await fetch(`${API_BASE_URL}/api/reports/department?${params.toString()}`, { headers });
     const result = await response.json();
@@ -48,11 +49,20 @@ export const reportService = {
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
 
-    return result.data;
+    return {
+      report: result.data.report,
+      summary: {
+        totalCapital: result.data.summary.totalCapital,
+        totalRevenue: result.data.summary.totalRevenue,
+        totalConsumable: result.data.summary.totalConsumable,
+        grandTotal: result.data.summary.grandTotal,
+        itemCount: result.data.summary.itemCount
+      }
+    };
   },
 
   // Get vendor report
-  getVendorReport: async (filters?: ReportFilters): Promise<{ report: any[] }> => {
+  getVendorReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -73,11 +83,20 @@ export const reportService = {
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
 
-    return result.data;
+    return {
+      report: result.data.report,
+      summary: {
+        totalCapital: result.data.summary.totalCapital,
+        totalRevenue: result.data.summary.totalRevenue,
+        totalConsumable: result.data.summary.totalConsumable,
+        grandTotal: result.data.summary.grandTotal,
+        itemCount: result.data.summary.itemCount
+      }
+    };
   },
 
   // Get item report
-  getItemReport: async (filters?: ReportFilters): Promise<{ report: any[] }> => {
+  getItemReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -98,11 +117,20 @@ export const reportService = {
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
 
-    return result.data;
+    return {
+      report: result.data.report,
+      summary: {
+        totalCapital: result.data.summary.totalCapital,
+        totalRevenue: result.data.summary.totalRevenue,
+        totalConsumable: result.data.summary.totalConsumable,
+        grandTotal: result.data.summary.grandTotal,
+        itemCount: result.data.summary.itemCount
+      }
+    };
   },
 
   // Get year report
-  getYearReport: async (): Promise<{ report: any[] }> => {
+  getYearReport: async (): Promise<{ report: any[]; summary: any }> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -118,7 +146,16 @@ export const reportService = {
       throw new Error(result.error || `HTTP error! status: ${response.status}`);
     }
 
-    return result.data;
+    return {
+      report: result.data.report,
+      summary: {
+        totalCapital: result.data.summary.totalCapital,
+        totalRevenue: result.data.summary.totalRevenue,
+        totalConsumable: result.data.summary.totalConsumable,
+        grandTotal: result.data.summary.grandTotal,
+        itemCount: result.data.summary.itemCount
+      }
+    };
   },
 
   // Generate report with filters
@@ -183,6 +220,34 @@ export const reportService = {
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
+  // Download bills as ZIP
+  downloadBills: async (selectedAssetIds: string[], filters: ReportFilters = {}): Promise<Blob> => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const params = new URLSearchParams();
+    if (selectedAssetIds.length > 0) {
+      params.append('assetIds', selectedAssetIds.join(','));
+    }
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && key !== 'academicYear') {
+        params.append(key, value);
+      }
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/reports/download/bills?${params.toString()}`, { headers });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
 
     return response.blob();

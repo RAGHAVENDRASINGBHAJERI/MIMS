@@ -3,7 +3,7 @@ import api from './api';
 export interface Category {
   id: string;
   name: string;
-  type: 'capital' | 'revenue';
+  type: 'capital' | 'revenue' | 'consumable';
   description?: string;
   createdAt: string;
 }
@@ -17,6 +17,17 @@ const capitalCategories = [
   { id: '5', name: 'Audio/Visual Equipment', type: 'capital' as const, description: 'Projectors, speakers, cameras', createdAt: '2024-01-01T00:00:00.000Z' },
   { id: '6', name: 'Network Equipment', type: 'capital' as const, description: 'Routers, switches, cables', createdAt: '2024-01-01T00:00:00.000Z' },
   { id: '7', name: 'Maintenance Tools', type: 'capital' as const, description: 'Tools for maintenance work', createdAt: '2024-01-01T00:00:00.000Z' },
+];
+
+const consumableCategories = [
+  { id: '17', name: 'Stationery', type: 'consumable' as const, description: 'Pens, paper, notebooks', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '18', name: 'Lab Consumables', type: 'consumable' as const, description: 'Chemicals, reagents, disposables', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '19', name: 'Office Supplies', type: 'consumable' as const, description: 'Printer ink, toner, office materials', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '20', name: 'Cleaning Supplies', type: 'consumable' as const, description: 'Cleaning materials and detergents', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '21', name: 'Maintenance Supplies', type: 'consumable' as const, description: 'Maintenance and repair materials', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '22', name: 'IT Consumables', type: 'consumable' as const, description: 'Cables, connectors, small IT parts', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '23', name: 'Safety Equipment', type: 'consumable' as const, description: 'Gloves, masks, safety gear', createdAt: '2024-01-01T00:00:00.000Z' },
+  { id: '24', name: 'General Supplies', type: 'consumable' as const, description: 'Miscellaneous consumable items', createdAt: '2024-01-01T00:00:00.000Z' },
 ];
 
 const revenueCategories = [
@@ -33,18 +44,20 @@ const revenueCategories = [
 
 export const categoryService = {
   // Get all categories
-  getAllCategories: async (type?: 'capital' | 'revenue'): Promise<Category[]> => {
+  getAllCategories: async (type?: 'capital' | 'revenue' | 'consumable'): Promise<Category[]> => {
     if (type === 'capital') {
       return capitalCategories;
     } else if (type === 'revenue') {
       return revenueCategories;
+    } else if (type === 'consumable') {
+      return consumableCategories;
     }
-    return [...capitalCategories, ...revenueCategories];
+    return [...capitalCategories, ...revenueCategories, ...consumableCategories];
   },
 
   // Get category by ID
   getCategoryById: async (id: string): Promise<Category> => {
-    const allCategories = [...capitalCategories, ...revenueCategories];
+    const allCategories = [...capitalCategories, ...revenueCategories, ...consumableCategories];
     const category = allCategories.find(cat => cat.id === id);
     if (!category) {
       throw new Error('Category not found');

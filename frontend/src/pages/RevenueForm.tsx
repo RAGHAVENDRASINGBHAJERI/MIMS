@@ -16,6 +16,7 @@ import { departmentService } from '@/services/departmentService';
 import { categoryService } from '@/services/categoryService';
 import { assetService, type AssetFormData } from '@/services/assetService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, Save, Calculator, FileText, User, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -63,6 +64,7 @@ export default function RevenueForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { state, dispatch } = useAssetFlow();
+  const { user, isAdmin, isChiefAdministrativeOfficer } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,14 +87,19 @@ export default function RevenueForm() {
     const fetchData = async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
-        
+
         const [departments, categories] = await Promise.all([
           departmentService.getAllDepartments(),
           categoryService.getAllCategories('revenue')
         ]);
-        
+
         dispatch({ type: 'SET_DEPARTMENTS', payload: departments });
         dispatch({ type: 'SET_CATEGORIES', payload: categories });
+
+        // Auto-select department for department-officer
+        if (user?.role === 'department-officer' && user.department) {
+          setValue('department', user.department._id);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -106,7 +113,7 @@ export default function RevenueForm() {
     };
 
     fetchData();
-  }, [dispatch, toast]);
+  }, [dispatch, toast, user, setValue]);
 
   const onSubmit = async (data: AssetFormValues) => {
     if (!selectedFile) {
@@ -284,8 +291,8 @@ export default function RevenueForm() {
                   <Label htmlFor="department" className="text-sm font-medium text-gray-700">
                     Department *
                   </Label>
-                  <Select onValueChange={(value) => setValue('department', value)}>
-                    <SelectTrigger 
+                  <Select onValueChange={(value) => setValue('department', value)} disabled={user?.role === 'department-officer'}>
+                    <SelectTrigger
                       id="department"
                       aria-label="Select Department"
                       className="mt-1"
