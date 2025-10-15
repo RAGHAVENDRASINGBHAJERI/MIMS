@@ -30,10 +30,5 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
   }
 
-  // Restrict department-officer role: only allow access to /dashboard
-  if (user?.role === 'department-officer' && location.pathname !== '/dashboard') {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   return <>{children}</>;
 }

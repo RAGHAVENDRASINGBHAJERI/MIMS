@@ -1,25 +1,18 @@
-# Frontend Form Updates for Asset Management
+# Authentication and Routing Enhancement TODO
 
-## Tasks to Complete
+## Current Status
+- [x] Plan approved by user
+- [ ] Update Login.tsx: Change navigation to /dashboard and add auth check
+- [ ] Update App.tsx: Change /dashboard route to DepartmentDashboard
+- [ ] Update ProtectedRoute.tsx: Remove role restrictions
+- [ ] Update Navbar.tsx: Add conditional rendering and logout
+- [ ] Test authentication flow
+- [ ] Test protected routes access
+- [ ] Test logout functionality
+- [ ] Test authentication persistence
 
-### 1. Update AssetFormData Interface
-- [x] Add optional fields: collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark to AssetFormData interface in assetService.ts
-
-### 2. Update CapitalForm.tsx
-- [ ] Add new fields to assetSchema validation
-- [ ] Add ISR Numbers section to form
-- [ ] Add GST Details section to form
-- [ ] Add Remarks section to form
-- [ ] Update onSubmit function to include new fields
-
-### 3. Update RevenueForm.tsx
-- [ ] Add new fields to assetSchema validation
-- [ ] Add ISR Numbers section to form
-- [ ] Add GST Details section to form
-- [ ] Add Remarks section to form
-- [ ] Update onSubmit function to include new fields
-
-### 4. Testing
-- [ ] Test CapitalForm submission with new fields
-- [ ] Test RevenueForm submission with new fields
-- [ ] Verify backend accepts all fields correctly
+## Files to Edit
+- frontend/src/pages/Login.tsx
+- frontend/src/App.tsx
+- frontend/src/components/ProtectedRoute.tsx
+- frontend/src/components/layout/Navbar.tsx

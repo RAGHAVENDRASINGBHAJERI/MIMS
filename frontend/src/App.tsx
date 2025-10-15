@@ -21,6 +21,7 @@ import RevenueForm from "./pages/RevenueForm";
 import Reports from "./pages/Reports";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import DepartmentDashboard from "./pages/DepartmentDashboard";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +45,7 @@ const App = () => (
                       <Route path="/" element={<Landing />} />
                       <Route path="/dashboard" element={
                         <ProtectedRoute>
-                          <Index />
+                          <DepartmentDashboard />
                         </ProtectedRoute>
                       } />
                       <Route path="/add-material" element={

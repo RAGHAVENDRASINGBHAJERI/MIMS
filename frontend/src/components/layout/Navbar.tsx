@@ -5,7 +5,7 @@ import { useAssetFlow } from '@/context/AssetFlowContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ const itemVariants = {
 
 export function Navbar() {
   const { dispatch } = useAssetFlow();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -50,7 +50,7 @@ export function Navbar() {
       title: 'Success',
       description: 'Logged out successfully',
     });
-    navigate('/login');
+    navigate('/');
   };
 
   const handleNotificationClick = () => {
@@ -68,7 +68,7 @@ export function Navbar() {
       transition={{ duration: 0.6, ease: "easeOut" }}
       className="h-20 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between px-8 shadow-lg sticky top-0 z-50"
     >
-      <motion.div 
+      <motion.div
         className="flex items-center gap-4"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -87,14 +87,14 @@ export function Navbar() {
             <Menu className="h-5 w-5" />
           </Button>
         </motion.div>
-        
-        <motion.div 
+
+        <motion.div
           className="flex items-center gap-3"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <motion.div 
+          <motion.div
             className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg overflow-hidden"
             initial={{ rotate: -10, scale: 0.8 }}
             animate={{ rotate: 0, scale: 1 }}
@@ -113,7 +113,7 @@ export function Navbar() {
             </svg>
           </motion.div>
           <div className="text-white">
-            <motion.h1 
+            <motion.h1
               className="text-xl font-bold"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
@@ -121,7 +121,7 @@ export function Navbar() {
             >
               Material Inward Management System
             </motion.h1>
-            <motion.p 
+            <motion.p
               className="text-sm text-gray-300"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
@@ -133,48 +133,84 @@ export function Navbar() {
         </motion.div>
       </motion.div>
 
-      <motion.div 
+      <motion.div
         className="flex items-center gap-6"
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
       >
-        <motion.div className="flex items-center gap-4 text-white">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/dashboard')}
-          >
-            Dashboard
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/login')}
-          >
-            Login
-          </motion.button>
-          {/* Removed Dashboard button as per user request */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/login')}
-          >
-            Add New Material
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-            onClick={() => navigate('/login')}
-          >
-            Reports
-          </motion.button>
-          {/* Removed Receipts button as per user request */}
-        </motion.div>
+        {isAuthenticated ? (
+          <motion.div className="flex items-center gap-4 text-white">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              onClick={() => navigate('/dashboard')}
+            >
+              Dashboard
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              onClick={() => navigate('/add-material')}
+            >
+              Add Material
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              onClick={() => navigate('/reports')}
+            >
+              Reports
+            </motion.button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="" alt={user?.name} />
+                    <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </motion.div>
+        ) : (
+          <motion.div className="flex items-center gap-4 text-white">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              onClick={() => navigate('/login')}
+            >
+              Login
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              onClick={() => navigate('/register')}
+            >
+              Register
+            </motion.button>
+          </motion.div>
+        )}
       </motion.div>
     </motion.nav>
   );
