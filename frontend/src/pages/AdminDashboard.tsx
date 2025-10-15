@@ -339,7 +339,7 @@ const AdminDashboard = () => {
     }
   };
 
-  if (user?.role !== 'admin') {
+  if (!user || user.role !== 'admin') {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -360,7 +360,7 @@ const AdminDashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage users, departments, and assets</p>
+          <p className="text-gray-600">Manage users, departments, and assets for All Departments</p>
         </div>
         <Button onClick={handleSeedData} disabled={loading} variant="outline">
           <Database className="h-4 w-4 mr-2" />

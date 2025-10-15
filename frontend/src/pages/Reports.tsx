@@ -147,7 +147,14 @@ export default function Reports() {
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      const blob = await reportService.exportToExcel(reportType);
+      const exportFilters: Record<string, string> = {};
+      if (filters.departmentId) exportFilters.departmentId = filters.departmentId;
+      if (filters.vendorName) exportFilters.vendorName = filters.vendorName;
+      if (filters.itemName) exportFilters.itemName = filters.itemName;
+      if (filters.startDate) exportFilters.startDate = filters.startDate;
+      if (filters.endDate) exportFilters.endDate = filters.endDate;
+
+      const blob = await reportService.exportToExcel(reportType, exportFilters);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -156,7 +163,7 @@ export default function Reports() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Success',
         description: 'Report exported to Excel successfully',
@@ -536,7 +543,7 @@ export default function Reports() {
                   className="text-center p-4 bg-success/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-success">
-                    {((reportData?.assets || []).filter((asset: any) => asset.type === 'capital').length || (state.assets || []).filter((asset: any) => asset.type === 'capital').length) || 0}
+                    {((reportData?.assets?.assets || []).filter((asset: Asset) => asset.type === 'capital').length || (state.assets || []).filter((asset: Asset) => asset.type === 'capital').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Capital Assets</p>
                 </motion.div>
@@ -546,7 +553,7 @@ export default function Reports() {
                   className="text-center p-4 bg-info/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-info">
-                    {((reportData?.assets || []).filter((asset: any) => asset.type === 'revenue').length || (state.assets || []).filter((asset: any) => asset.type === 'revenue').length) || 0}
+                    {((reportData?.assets?.assets || []).filter((asset: Asset) => asset.type === 'revenue').length || (state.assets || []).filter((asset: Asset) => asset.type === 'revenue').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Revenue Assets</p>
                 </motion.div>

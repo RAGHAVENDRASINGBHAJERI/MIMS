@@ -11,7 +11,10 @@ export interface ReportFilters {
 }
 
 export interface ReportData {
-  assets: any[];
+  assets: {
+    assets: any[];
+    limit?: number;
+  };
   summary: {
     totalCapital: number;
     totalRevenue: number;
