@@ -1,18 +1,11 @@
-# Bill Download Feature Implementation
+# TODO: Update Excel Export for Combined Report with Filters and Specific Columns
 
-## Backend Changes
-- [ ] Install JSZip library in backend
-- [ ] Add exportBillsZip function in reportController.js
-- [ ] Add new route /api/reports/download/bills in reportRoutes.js
-
-## Frontend Changes
-- [ ] Add downloadBills function in reportService.ts
-- [ ] Update Reports.tsx to add checkboxes for asset selection
-- [ ] Add state for tracking selected assets in Reports.tsx
-- [ ] Add "Download Bills" button in Reports.tsx
-
-## Testing
-- [ ] Test ZIP download with selected assets
-- [ ] Test with filters applied
-- [ ] Verify existing Excel/Word export still works
-- [ ] Handle edge cases (missing bills, large files)
+## Pending Tasks
+- [ ] Update backend/src/controllers/reportController.js exportExcel function for default case:
+  - Apply filters from req.query (departmentId, type, startDate, endDate) similar to getCombinedReport.
+  - Redefine worksheet.columns to: Sl No., Date, College ISR No., IT ISR No., Particulars, Vendor, Bill Date, Bill No., Quantity, Rate, Amount, CGST, SGST, Grand Total, Remark.
+  - In rows mapping, add slNo (index + 1), map fields accordingly.
+  - After adding rows, add a total row with sums for Amount, CGST, SGST, Grand Total.
+- [ ] Update frontend/src/services/reportService.ts exportToExcel method to accept and pass filters.
+- [ ] Update frontend/src/pages/Reports.tsx exportToExcel call to pass current filters.
+- [ ] Test the export to ensure columns and totals are correct.

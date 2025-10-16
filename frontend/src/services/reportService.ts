@@ -50,13 +50,19 @@ export const reportService = {
     }
 
     return {
-      report: result.data.report,
-      summary: {
-        totalCapital: result.data.summary.totalCapital,
-        totalRevenue: result.data.summary.totalRevenue,
-        totalConsumable: result.data.summary.totalConsumable,
-        grandTotal: result.data.summary.grandTotal,
-        itemCount: result.data.summary.itemCount
+      report: result.data?.assets || [],
+      summary: result.data?.summary ? {
+        totalCapital: result.data.summary.totalCapital || 0,
+        totalRevenue: result.data.summary.totalRevenue || 0,
+        totalConsumable: result.data.summary.totalConsumable || 0,
+        grandTotal: result.data.summary.grandTotal || 0,
+        itemCount: result.data.summary.itemCount || 0
+      } : {
+        totalCapital: 0,
+        totalRevenue: 0,
+        totalConsumable: 0,
+        grandTotal: 0,
+        itemCount: 0
       }
     };
   },
@@ -84,13 +90,19 @@ export const reportService = {
     }
 
     return {
-      report: result.data.report,
-      summary: {
-        totalCapital: result.data.summary.totalCapital,
-        totalRevenue: result.data.summary.totalRevenue,
-        totalConsumable: result.data.summary.totalConsumable,
-        grandTotal: result.data.summary.grandTotal,
-        itemCount: result.data.summary.itemCount
+      report: result.data?.report || [],
+      summary: result.data?.summary ? {
+        totalCapital: result.data.summary.totalCapital || 0,
+        totalRevenue: result.data.summary.totalRevenue || 0,
+        totalConsumable: result.data.summary.totalConsumable || 0,
+        grandTotal: result.data.summary.grandTotal || 0,
+        itemCount: result.data.summary.itemCount || 0
+      } : {
+        totalCapital: 0,
+        totalRevenue: 0,
+        totalConsumable: 0,
+        grandTotal: 0,
+        itemCount: 0
       }
     };
   },
@@ -118,13 +130,19 @@ export const reportService = {
     }
 
     return {
-      report: result.data.report,
-      summary: {
-        totalCapital: result.data.summary.totalCapital,
-        totalRevenue: result.data.summary.totalRevenue,
-        totalConsumable: result.data.summary.totalConsumable,
-        grandTotal: result.data.summary.grandTotal,
-        itemCount: result.data.summary.itemCount
+      report: result.data?.report || [],
+      summary: result.data?.summary ? {
+        totalCapital: result.data.summary.totalCapital || 0,
+        totalRevenue: result.data.summary.totalRevenue || 0,
+        totalConsumable: result.data.summary.totalConsumable || 0,
+        grandTotal: result.data.summary.grandTotal || 0,
+        itemCount: result.data.summary.itemCount || 0
+      } : {
+        totalCapital: 0,
+        totalRevenue: 0,
+        totalConsumable: 0,
+        grandTotal: 0,
+        itemCount: 0
       }
     };
   },

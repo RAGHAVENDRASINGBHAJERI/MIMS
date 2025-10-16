@@ -19,19 +19,16 @@ import {
   ArrowLeft,
   FileBarChart,
   Download,
-  FileText,
   Filter,
   TrendingUp,
   DollarSign,
   Calendar,
   Building2,
   Edit,
-  Trash2,
-  Archive
+  Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -57,59 +54,11 @@ export default function Reports() {
   const [reportData, setReportData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [isDownloadingBills, setIsDownloadingBills] = useState(false);
   const [reportType, setReportType] = useState<'combined' | 'vendor' | 'item' | 'department' | 'year'>('combined');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<AssetFormData>>({});
   const [isUpdating, setIsUpdating] = useState(false);
-  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
-
-  const handleSelectAll = (checked: boolean) => {
-    if (reportType !== 'combined' && reportType !== 'item') return;
-    const data = (reportType === 'combined' ? (reportData as any)?.assets?.assets || [] : (reportData as any)?.report || []) as any[];
-    if (checked) {
-      const allIds = data.map((item: any) => item._id).filter((id: string) => id);
-      setSelectedAssets(new Set(allIds));
-    } else {
-      setSelectedAssets(new Set());
-    }
-  };
-
-  const isAllSelected = (() => {
-    if (reportType !== 'combined' && reportType !== 'item') return false;
-    const data = (reportType === 'combined' ? (reportData as any)?.assets?.assets || [] : (reportData as any)?.report || []) as any[];
-    return data.length > 0 && data.every((item: any) => selectedAssets.has(item._id));
-  })();
-
-  const downloadBills = async () => {
-    setIsDownloadingBills(true);
-    try {
-      const blob = await reportService.downloadBills(Array.from(selectedAssets), filters);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `bills_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: 'Success',
-        description: 'Bills downloaded successfully',
-      });
-    } catch (error) {
-      console.error('Error downloading bills:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to download bills',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDownloadingBills(false);
-    }
-  };
 
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -154,7 +103,19 @@ export default function Reports() {
           reportData = await reportService.generateReport(filters);
       }
 
-      if ((!reportData.report || reportData.report.length === 0) && (!reportData.assets || reportData.assets.length === 0)) {
+      // Set summary for all report types if available
+      if (reportData.data) {
+        if (reportData.data.totalCapital !== undefined) {
+          reportData.summary = {
+            totalCapital: reportData.data.totalCapital,
+            totalRevenue: reportData.data.totalRevenue,
+            grandTotal: reportData.data.grandTotal,
+            itemCount: reportData.data.report ? reportData.data.report.length : (reportData.data.assets ? reportData.data.assets.length : 0)
+          };
+        }
+      }
+
+      if ((!reportData.assets || reportData.assets.length === 0) && (!reportData.report || reportData.report.length === 0)) {
         toast({
           title: 'Warning',
           description: 'No data found for the selected filters.',
@@ -185,14 +146,7 @@ export default function Reports() {
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      const exportFilters: Record<string, string> = {};
-      if (filters.departmentId) exportFilters.departmentId = filters.departmentId;
-      if (filters.vendorName) exportFilters.vendorName = filters.vendorName;
-      if (filters.itemName) exportFilters.itemName = filters.itemName;
-      if (filters.startDate) exportFilters.startDate = filters.startDate;
-      if (filters.endDate) exportFilters.endDate = filters.endDate;
-
-      const blob = await reportService.exportToExcel(reportType, exportFilters);
+      const blob = await reportService.exportToExcel(reportType, filters as Record<string, string>);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -217,33 +171,7 @@ export default function Reports() {
     }
   };
 
-  const exportToWord = async () => {
-    setIsExporting(true);
-    try {
-      const blob = await reportService.exportToWord(reportType);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `asset-report-${reportType}-${new Date().toISOString().split('T')[0]}.docx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
 
-      toast({
-        title: 'Success',
-        description: 'Report exported to Word successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to export to Word',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const handleEdit = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -310,26 +238,11 @@ export default function Reports() {
     }
   };
 
-  const handlePreviewBill = async (assetId: string) => {
-    try {
-      const blob = await assetService.previewBill(assetId);
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch (error) {
-      console.error('Error previewing bill:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to preview bill',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleDeleteVendor = async (vendorName: string) => {
     try {
       // Get all assets to find those from this vendor
       const allAssets = await assetService.getAssets();
-      const vendorAssets = allAssets.assets.filter(asset => asset.vendorName === vendorName);
+      const vendorAssets = allAssets.filter(asset => asset.vendorName === vendorName);
 
       // Delete each asset from this vendor
       for (const asset of vendorAssets) {
@@ -356,7 +269,7 @@ export default function Reports() {
     try {
       // Get all assets to find those from this department
       const allAssets = await assetService.getAssets();
-      const departmentAssets = allAssets.assets.filter(asset => asset.department?.name === departmentName);
+      const departmentAssets = allAssets.filter(asset => asset.department?.name === departmentName);
 
       // Delete each asset from this department
       for (const asset of departmentAssets) {
@@ -499,7 +412,7 @@ export default function Reports() {
               <Label>Type</Label>
               <Select
                 value={editFormData.type || ''}
-                onValueChange={(value) => setEditFormData({ ...editFormData, type: value as 'capital' | 'revenue' | 'consumable' })}
+                onValueChange={(value) => setEditFormData({ ...editFormData, type: value as 'capital' | 'revenue' })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -572,7 +485,7 @@ export default function Reports() {
                   whileHover={{ scale: 1.05 }}
                   className="text-center p-4 bg-primary/5 rounded-lg"
                 >
-                  <p className="text-2xl font-bold text-primary">{ ((reportData?.assets?.assets || []) as Asset[]).length || ((state.assets || []) as Asset[]).length || 0 }</p>
+                  <p className="text-2xl font-bold text-primary">{reportData?.data?.assets?.length || (state.assets || []).length || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Assets</p>
                 </motion.div>
                 <motion.div
@@ -581,7 +494,7 @@ export default function Reports() {
                   className="text-center p-4 bg-success/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-success">
-                    {(((reportData?.assets?.assets || []) as Asset[]).filter((asset) => asset.type === 'capital').length || ((state.assets || []) as Asset[]).filter((asset) => asset.type === 'capital').length) || 0}
+                    {((reportData?.data?.assets || []).filter((asset: any) => asset.type === 'capital').length || (state.assets || []).filter((asset: any) => asset.type === 'capital').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Capital Assets</p>
                 </motion.div>
@@ -591,7 +504,7 @@ export default function Reports() {
                   className="text-center p-4 bg-info/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-info">
-                    {(((reportData?.assets?.assets || []) as Asset[]).filter((asset: Asset) => asset.type === 'revenue').length || ((state.assets || []) as Asset[]).filter((asset: Asset) => asset.type === 'revenue').length) || 0}
+                    {((reportData?.data?.assets || []).filter((asset: any) => asset.type === 'revenue').length || (state.assets || []).filter((asset: any) => asset.type === 'revenue').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Revenue Assets</p>
                 </motion.div>
@@ -661,18 +574,32 @@ export default function Reports() {
                     </Select>
                   </div>
                 )}
-                
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Select value={filters.departmentId} onValueChange={(value) => setFilters({ ...filters, departmentId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null}>All Departments</SelectItem>
+                      {(state.departments || []).filter(dept => dept._id && dept.name).map((dept) => (
+                        <SelectItem key={dept._id} value={dept._id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <div className="space-y-2">
                   <Label>Asset Type</Label>
-                  <Select value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: (value as 'capital' | 'revenue' | 'consumable') || undefined })}>
+                  <Select value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: (value as 'capital' | 'revenue') || undefined })}>
                     <SelectTrigger>
                       <SelectValue placeholder="All types" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="capital">Capital Assets</SelectItem>
                       <SelectItem value="revenue">Revenue Assets</SelectItem>
-                      <SelectItem value="consumable">Consumable Assets</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -721,7 +648,7 @@ export default function Reports() {
                       </Button>
                     </motion.div>
                     
-                    
+
                   </>
                 )}
               </div>
@@ -741,7 +668,7 @@ export default function Reports() {
             {/* Summary Cards */}
             {reportData.summary && (
               <motion.div
-                className="grid grid-cols-1 md:grid-cols-5 gap-4"
+                className="grid grid-cols-1 md:grid-cols-4 gap-4"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -760,13 +687,6 @@ export default function Reports() {
                     icon: <TrendingUp className="h-8 w-8 text-success/70" />,
                     key: 'totalRevenue',
                     colorClass: 'text-success',
-                  },
-                  {
-                    label: 'Total Consumable',
-                    value: `₹${reportData.summary.totalConsumable?.toLocaleString() || '0'}`,
-                    icon: <Building2 className="h-8 w-8 text-warning/70" />,
-                    key: 'totalConsumable',
-                    colorClass: 'text-warning',
                   },
                   {
                     label: 'Grand Total',
@@ -877,7 +797,7 @@ export default function Reports() {
               </h3>
 
               {(() => {
-                const data = reportType === 'combined' ? (reportData?.assets?.assets || []) : (reportData?.report || []);
+                const data = reportType === 'combined' || reportType === 'department' ? (reportData?.assets || []) : (reportData?.report || []);
                 const hasData = data.length > 0;
 
                 if (!hasData) {
