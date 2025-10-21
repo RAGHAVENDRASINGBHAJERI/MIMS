@@ -1,0 +1,25 @@
+{
+  "type": "Compass Connections",
+  "version": {
+    "$numberInt": "1"
+  },
+  "connections": [
+    {
+      "id": "e434879d-c215-449c-8fb6-cfaf75d5d885",
+      "lastUsed": {
+        "$date": {
+          "$numberLong": "1761046806159"
+        }
+      },
+      "favorite": {
+        "name": "InwardManagementSystem"
+      },
+      "savedConnectionType": "recent",
+      "connectionOptions": {
+        "connectionString": "mongodb://localhost:27017/",
+        "oidc": {}
+      },
+      "connectionSecrets": "AAG9mekpV24xE+djXZUieIoGr+hp4H2jkKh1lXTp5o6ilMjSF6Mk41QjbF9kvmihbxfxTyvChYSVALrViWdi109rQYyzOB3mJ0lUpsKVDa9E+c+r3UybK7d4Ht0j0v92vOab40PSOfJTSGvb9YdzJzxZw76EUbSomVtl+p/AGnVR6nexESatafeLVbE="
+    }
+  ]
+}
