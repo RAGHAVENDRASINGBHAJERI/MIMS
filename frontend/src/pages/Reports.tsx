@@ -637,7 +637,7 @@ export default function Reports() {
                     </SelectTrigger>
                     <SelectContent>
                       {(isAdmin || isChiefAdministrativeOfficer) && (
-                        <SelectItem value="">All Departments</SelectItem>
+                        <SelectItem value="all">All Departments</SelectItem>
                       )}
                       {(state.departments || [])
                         .filter(dept => {
