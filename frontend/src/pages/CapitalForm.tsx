@@ -35,9 +35,7 @@ const assetSchema = z.object({
   collegeISRNo: z.string().optional(),
   itISRNo: z.string().optional(),
 
-  cgst: z.number().min(0, 'CGST (%) must be 0 or greater').max(100, 'CGST (%) cannot exceed 100').optional(),
-  sgst: z.number().min(0, 'SGST (%) must be 0 or greater').max(100, 'SGST (%) cannot exceed 100').optional(),
-  grandTotal: z.number().min(0, 'Grand total cannot be negative').optional(),
+  // GST captured per item; no GST at form level
   remark: z.string().optional(),
 });
 
@@ -82,10 +80,9 @@ export default function CapitalForm() {
 
   const quantity = watch('quantity') || 0;
   const pricePerItem = watch('pricePerItem') || 0;
-  const cgst = watch('cgst') || 0;
-  const sgst = watch('sgst') || 0;
+  // GST handled at item level only
   const totalAmount = quantity * pricePerItem;
-  const grandTotal = totalAmount + (totalAmount * cgst / 100) + (totalAmount * sgst / 100);
+  const grandTotal = totalAmount; // item-level GST only
 
   useEffect(() => {
     const fetchData = async () => {
@@ -148,9 +145,8 @@ export default function CapitalForm() {
         collegeISRNo: data.collegeISRNo,
         itISRNo: data.itISRNo,
 
-        cgst: data.cgst,
-        sgst: data.sgst,
-        grandTotal: billGrandTotal || grandTotal,
+        // GST provided at item level only
+        grandTotal: billGrandTotal,
         remark: data.remark,
         items,
       };
@@ -275,39 +271,7 @@ export default function CapitalForm() {
               </div>
             </motion.div>
 
-            {/* Bill Totals */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="border-b border-gray-200 pb-6"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center shadow-sm">
-                  <Calculator className="h-4 w-4 text-teal-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Bill Totals</h3>
-                  <p className="text-sm text-gray-600">Aggregated from all items.</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormInput
-                  label="Total Amount (₹)"
-                  type="number"
-                  value={billTotalAmount}
-                  readOnly
-                  className="bg-gray-50"
-                />
-                <FormInput
-                  label="Grand Total (₹)"
-                  type="number"
-                  value={billGrandTotal}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-            </motion.div>
+          
 
             {/* Item Details Section */}
             <motion.div
@@ -415,6 +379,7 @@ export default function CapitalForm() {
                         value={it.sgst}
                         onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, sgst: Number(e.target.value) } : x))}
                       />
+                
                       <div>
                         <Label>Total</Label>
                         <div className="h-10 rounded-md border bg-gray-50 px-3 flex items-center">
@@ -468,13 +433,7 @@ export default function CapitalForm() {
                   {...register('contactNumber', { required: true })}
                   error={errors.contactNumber?.message}
                 />
-                <FormInput
-                  label="Vendor Email"
-                  type="email"
-                  placeholder="Enter vendor email"
-                  {...register('email', { required: true })}
-                  error={errors.email?.message}
-                />
+                
               </div>
             </motion.div>
 
@@ -510,45 +469,35 @@ export default function CapitalForm() {
               </div>
             </motion.div>
 
-            {/* GST Details Section */}
+            
+              {/* Bill Totals */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.35 }}
               className="border-b border-gray-200 pb-6"
             >
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center shadow-sm">
-                  <Calculator className="h-4 w-4 text-orange-700" />
+                <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <Calculator className="h-4 w-4 text-teal-700" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">GST Details</h3>
-                  <p className="text-sm text-gray-600">Goods and Services Tax information.</p>
+                  <h3 className="text-lg font-semibold text-gray-800">Bill Totals</h3>
+                  <p className="text-sm text-gray-600">Aggregated from all items.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                 <FormInput
-                  label="CGST (%)"
+                  label="Total Amount (₹)"
                   type="number"
-                  step="0.01"
-                  placeholder="Enter CGST percentage"
-                  {...register('cgst', { valueAsNumber: true })}
-                  error={errors.cgst?.message}
-                />
-                <FormInput
-                  label="SGST (%)"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter SGST percentage"
-                  {...register('sgst', { valueAsNumber: true })}
-                  error={errors.sgst?.message}
+                  value={billTotalAmount}
+                  readOnly
+                  className="bg-gray-50"
                 />
                 <FormInput
                   label="Grand Total (₹)"
                   type="number"
-                  step="0.01"
-                  value={grandTotal}
+                  value={billGrandTotal}
                   readOnly
                   className="bg-gray-50"
                 />

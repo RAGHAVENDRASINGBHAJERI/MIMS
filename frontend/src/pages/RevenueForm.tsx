@@ -52,9 +52,7 @@ const assetSchema = z.object({
   collegeISRNo: z.string().optional(),
   itISRNo: z.string().optional(),
 
-  cgst: z.number().min(0, 'CGST cannot be negative').optional(),
-  sgst: z.number().min(0, 'SGST cannot be negative').optional(),
-  grandTotal: z.number().min(0, 'Grand total cannot be negative').optional(),
+  // GST captured per item; no GST at form level
   remark: z.string().optional(),
 });
 
@@ -162,9 +160,8 @@ export default function RevenueForm() {
         collegeISRNo: data.collegeISRNo,
         itISRNo: data.itISRNo,
 
-        cgst: data.cgst,
-        sgst: data.sgst,
-        grandTotal: billGrandTotal || data.grandTotal,
+        // GST provided at item level only
+        grandTotal: billGrandTotal,
         remark: data.remark,
         items,
       };
@@ -436,7 +433,7 @@ export default function RevenueForm() {
                         </div>
                       </div>
                       <div className="md:col-span-6 flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                        <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, igst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
                         {items.length > 1 && (
                           <Button type="button" variant="destructive" onClick={() => setItems(items.filter((_, i) => i !== idx))}>Remove</Button>
                         )}
@@ -550,22 +547,7 @@ export default function RevenueForm() {
                   {...register('cgst', { valueAsNumber: true })}
                   error={errors.cgst?.message}
                 />
-                <FormInput
-                  label="SGST (₹)"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter SGST amount"
-                  {...register('sgst', { valueAsNumber: true })}
-                  error={errors.sgst?.message}
-                />
-                <FormInput
-                  label="Grand Total (₹)"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter grand total"
-                  {...register('grandTotal', { valueAsNumber: true })}
-                  error={errors.grandTotal?.message}
-                />
+                
               </div>
             </motion.div>
 
