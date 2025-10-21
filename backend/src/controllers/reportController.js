@@ -7,7 +7,6 @@ import { Document, Packer, Paragraph, TextRun } from 'docx';
 import JSZip from 'jszip';
 import archiver from 'archiver';
 import { getGridFS } from '../utils/gridfs.js';
-import PDFDocument from 'pdfkit';
 
 export const getDepartmentReport = async (req, res, next) => {
   try {
@@ -430,15 +429,42 @@ export const exportWord = async (req, res, next) => {
     let filename = '';
 
     switch (type) {
-      case 'department':
+      case 'department': {
+        const departmentId = req.query.departmentId;
+        const matchStage = departmentId
+          ? { $match: { department: new mongoose.Types.ObjectId(departmentId) } }
+          : { $match: {} };
         report = await Asset.aggregate([
           { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
           { $unwind: '$dept' },
-          { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+          matchStage,
+          { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 }, totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } }, totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } } } },
           { $sort: { totalAmount: -1 } }
         ]);
+        // Rename _id to departmentName for clarity
+        report = report.map(item => ({
+          departmentName: item._id,
+          totalAmount: item.totalAmount,
+          count: item.count,
+          totalCapital: item.totalCapital,
+          totalRevenue: item.totalRevenue
+        }));
         filename = 'department_report.docx';
         break;
+      }
+      case 'vendor': {
+        const vendorName = req.query.vendorName;
+        const matchStage = vendorName
+          ? { $match: { vendorName: { $regex: new RegExp(vendorName, 'i') } } }
+          : { $match: {} };
+        report = await Asset.aggregate([
+          matchStage,
+          { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+          { $sort: { totalAmount: -1 } }
+        ]);
+        filename = 'vendor_report.docx';
+        break;
+      }
       case 'year':
         report = await Asset.aggregate([
           {
@@ -450,7 +476,9 @@ export const exportWord = async (req, res, next) => {
             $group: {
               _id: '$calendarYear',
               totalAssets: { $sum: 1 },
-              totalAmount: { $sum: '$totalAmount' }
+              totalAmount: { $sum: '$totalAmount' },
+              totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
+              totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } }
             }
           },
           {
@@ -460,7 +488,29 @@ export const exportWord = async (req, res, next) => {
         filename = 'year_report.docx';
         break;
       default:
-        report = await Asset.find()
+        const { departmentId, type: assetType, startDate, endDate } = req.query;
+
+        const filterQuery = {};
+
+        if (departmentId) {
+          filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+        }
+
+        if (assetType) {
+          filterQuery.type = assetType;
+        }
+
+        if (startDate || endDate) {
+          filterQuery.billDate = {};
+          if (startDate) {
+            filterQuery.billDate.$gte = new Date(startDate);
+          }
+          if (endDate) {
+            filterQuery.billDate.$lte = new Date(endDate);
+          }
+        }
+
+        report = await Asset.find(filterQuery)
           .populate('department', 'name')
           .lean()
           .sort({ billDate: -1 });
@@ -632,158 +682,7 @@ export const getCombinedReport = async (req, res, next) => {
   }
 };
 
-export const exportPDF = async (req, res, next) => {
-  try {
-    const { departmentId, type, startDate, endDate } = req.query;
 
-    const filterQuery = {};
-
-    if (departmentId) {
-      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
-    }
-
-    if (type) {
-      filterQuery.type = type;
-    }
-
-    if (startDate || endDate) {
-      filterQuery.billDate = {};
-      if (startDate) {
-        filterQuery.billDate.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filterQuery.billDate.$lte = new Date(endDate);
-      }
-    }
-
-    const assets = await Asset.find(filterQuery)
-      .populate('department', 'name')
-      .lean()
-      .sort({ billDate: -1 });
-
-    // Flatten items for PDF
-    const flattenedRows = assets.flatMap(asset => {
-      if (Array.isArray(asset.items) && asset.items.length > 0) {
-        return asset.items.map((item, idx) => ({
-          slNo: idx + 1,
-          date: asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '',
-          collegeISRNo: asset.collegeISRNo || '',
-          itISRNo: asset.itISRNo || '',
-          particulars: item.particulars || '',
-          vendor: asset.vendorName || asset.vendor || '',
-          billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-          billNo: asset.billNo || '',
-          quantity: item.quantity || '',
-          rate: item.rate || '',
-          amount: item.amount || '',
-          cgst: item.cgst || '',
-          sgst: item.sgst || '',
-          grandTotal: item.grandTotal || '',
-          remark: asset.remark || ''
-        }));
-      }
-      return [{
-        slNo: 1,
-        date: asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '',
-        collegeISRNo: asset.collegeISRNo || '',
-        itISRNo: asset.itISRNo || '',
-        particulars: asset.itemName || '',
-        vendor: asset.vendorName || asset.vendor || '',
-        billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-        billNo: asset.billNo || '',
-        quantity: asset.quantity || '',
-        rate: asset.pricePerItem || '',
-        amount: asset.totalAmount || '',
-        cgst: asset.cgst || '',
-        sgst: asset.sgst || '',
-        grandTotal: asset.grandTotal || '',
-        remark: asset.remark || ''
-      }];
-    });
-
-    const doc = new PDFDocument({ margin: 50 });
-    const filename = `assets_report_${new Date().toISOString().split('T')[0]}.pdf`;
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    doc.pipe(res);
-
-    // Header
-    doc.fontSize(20).text('AssetFlow Report', { align: 'center' });
-    doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
-    doc.moveDown(2);
-
-    // Table headers
-    const headers = ['Sl No', 'Date', 'College ISR', 'IT ISR', 'Particulars', 'Vendor', 'Bill Date', 'Bill No', 'Qty', 'Rate', 'Amount', 'CGST', 'SGST', 'Grand Total', 'Remark'];
-    const colWidths = [40, 60, 80, 80, 120, 100, 80, 80, 40, 60, 80, 50, 50, 80, 100];
-    let x = 50;
-
-    headers.forEach((header, i) => {
-      doc.fontSize(8).text(header, x, doc.y, { width: colWidths[i], align: 'left' });
-      x += colWidths[i];
-    });
-
-    doc.moveDown(1);
-    doc.line(50, doc.y, 50 + colWidths.reduce((a, b) => a + b, 0), doc.y);
-    doc.moveDown(0.5);
-
-    // Table rows
-    flattenedRows.forEach(row => {
-      x = 50;
-      const rowData = [
-        row.slNo.toString(),
-        row.date,
-        row.collegeISRNo,
-        row.itISRNo,
-        row.particulars,
-        row.vendor,
-        row.billDate,
-        row.billNo,
-        row.quantity.toString(),
-        row.rate.toString(),
-        row.amount.toString(),
-        row.cgst.toString(),
-        row.sgst.toString(),
-        row.grandTotal.toString(),
-        row.remark
-      ];
-
-      rowData.forEach((data, i) => {
-        doc.fontSize(7).text(data || '', x, doc.y, { width: colWidths[i], align: 'left' });
-        x += colWidths[i];
-      });
-
-      doc.moveDown(0.8);
-
-      // Add new page if needed
-      if (doc.y > 700) {
-        doc.addPage();
-      }
-    });
-
-    // Add totals
-    const totalAmount = flattenedRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-    const totalCGST = flattenedRows.reduce((sum, row) => sum + (Number(row.cgst) || 0), 0);
-    const totalSGST = flattenedRows.reduce((sum, row) => sum + (Number(row.sgst) || 0), 0);
-    const totalGrandTotal = flattenedRows.reduce((sum, row) => sum + (Number(row.grandTotal) || 0), 0);
-
-    doc.moveDown(1);
-    doc.line(50, doc.y, 50 + colWidths.reduce((a, b) => a + b, 0), doc.y);
-    doc.moveDown(0.5);
-
-    x = 50;
-    const totalRow = ['', '', '', '', 'TOTAL', '', '', '', '', '', totalAmount.toString(), totalCGST.toString(), totalSGST.toString(), totalGrandTotal.toString(), ''];
-    totalRow.forEach((data, i) => {
-      doc.fontSize(8).text(data || '', x, doc.y, { width: colWidths[i], align: 'left' });
-      x += colWidths[i];
-    });
-
-    doc.end();
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const exportBillsZip = async (req, res, next) => {
   try {

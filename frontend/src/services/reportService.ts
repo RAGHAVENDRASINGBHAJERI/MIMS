@@ -5,7 +5,7 @@ export interface ReportFilters {
   departmentId?: string;
   itemName?: string;
   vendorName?: string;
-  type?: 'capital' | 'revenue' | 'consumable';
+  type?: 'capital' | 'revenue';
   startDate?: string;
   endDate?: string;
 }
@@ -18,7 +18,6 @@ export interface ReportData {
   summary: {
     totalCapital: number;
     totalRevenue: number;
-    totalConsumable: number;
     grandTotal: number;
     itemCount: number;
   };
@@ -54,13 +53,11 @@ export const reportService = {
       summary: result.data?.summary ? {
         totalCapital: result.data.summary.totalCapital || 0,
         totalRevenue: result.data.summary.totalRevenue || 0,
-        totalConsumable: result.data.summary.totalConsumable || 0,
         grandTotal: result.data.summary.grandTotal || 0,
         itemCount: result.data.summary.itemCount || 0
       } : {
         totalCapital: 0,
         totalRevenue: 0,
-        totalConsumable: 0,
         grandTotal: 0,
         itemCount: 0
       }
@@ -94,13 +91,11 @@ export const reportService = {
       summary: result.data?.summary ? {
         totalCapital: result.data.summary.totalCapital || 0,
         totalRevenue: result.data.summary.totalRevenue || 0,
-        totalConsumable: result.data.summary.totalConsumable || 0,
         grandTotal: result.data.summary.grandTotal || 0,
         itemCount: result.data.summary.itemCount || 0
       } : {
         totalCapital: 0,
         totalRevenue: 0,
-        totalConsumable: 0,
         grandTotal: 0,
         itemCount: 0
       }
@@ -134,13 +129,11 @@ export const reportService = {
       summary: result.data?.summary ? {
         totalCapital: result.data.summary.totalCapital || 0,
         totalRevenue: result.data.summary.totalRevenue || 0,
-        totalConsumable: result.data.summary.totalConsumable || 0,
         grandTotal: result.data.summary.grandTotal || 0,
         itemCount: result.data.summary.itemCount || 0
       } : {
         totalCapital: 0,
         totalRevenue: 0,
-        totalConsumable: 0,
         grandTotal: 0,
         itemCount: 0
       }
@@ -169,7 +162,6 @@ export const reportService = {
       summary: {
         totalCapital: result.data.summary.totalCapital,
         totalRevenue: result.data.summary.totalRevenue,
-        totalConsumable: result.data.summary.totalConsumable,
         grandTotal: result.data.summary.grandTotal,
         itemCount: result.data.summary.itemCount
       }
@@ -243,29 +235,7 @@ export const reportService = {
     return response.blob();
   },
 
-  // Export report to PDF
-  exportToPDF: async (filters: ReportFilters = {}): Promise<Blob> => {
-    const token = localStorage.getItem('token');
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && key !== 'academicYear') {
-        params.append(key, value);
-      }
-    });
-
-    const response = await fetch(`${API_BASE_URL}/api/reports/export/pdf?${params.toString()}`, { headers });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.blob();
-  },
 
   // Download bills as ZIP
   downloadBills: async (selectedAssetIds: string[], filters: ReportFilters = {}): Promise<Blob> => {

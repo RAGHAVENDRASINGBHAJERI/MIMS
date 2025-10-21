@@ -18,7 +18,7 @@ export interface Asset {
     type: string;
   };
   category: string;
-  type: 'capital' | 'revenue' | 'consumable';
+  type: 'capital' | 'revenue';
   billFileId: string;
   createdAt: string;
 }
@@ -35,7 +35,7 @@ export interface AssetFormData {
   billDate: string;
   department: string;
   category: string;
-  type?: 'capital' | 'revenue' | 'consumable';
+  type?: 'capital' | 'revenue';
   billFile?: File;
   collegeISRNo?: string;
   itISRNo?: string;

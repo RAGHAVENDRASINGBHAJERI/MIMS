@@ -3,6 +3,7 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 import { getAllUsers, createUser, updateUser, deleteUser } from '../controllers/userController.js';
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../controllers/departmentController.js';
 import { getAssets, createAsset, updateAsset, deleteAsset, uploadMiddleware } from '../controllers/assetController.js';
+import { validateFileUpload } from '../middleware/security.js';
 import seedDepartments from '../../seedDepartments.js';
 import seedUsers from '../../seedUsers.js';
 import seedAssets from '../../seedAssets.js';
@@ -34,10 +35,10 @@ router.route('/departments/:id')
 // Asset management routes
 router.route('/assets')
   .get(getAssets)
-  .post(uploadMiddleware, createAsset);
+  .post(uploadMiddleware, validateFileUpload, createAsset);
 
 router.route('/assets/:id')
-  .put(uploadMiddleware, updateAsset)
+  .put(uploadMiddleware, validateFileUpload, updateAsset)
   .delete(deleteAsset);
 
 // Data seeding route

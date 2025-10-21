@@ -51,7 +51,7 @@ const assetSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   collegeISRNo: z.string().optional(),
   itISRNo: z.string().optional(),
-  igst: z.number().min(0, 'IGST cannot be negative').optional(),
+
   cgst: z.number().min(0, 'CGST cannot be negative').optional(),
   sgst: z.number().min(0, 'SGST cannot be negative').optional(),
   grandTotal: z.number().min(0, 'Grand total cannot be negative').optional(),
@@ -161,7 +161,7 @@ export default function RevenueForm() {
         billFile: selectedFile,
         collegeISRNo: data.collegeISRNo,
         itISRNo: data.itISRNo,
-        igst: data.igst,
+
         cgst: data.cgst,
         sgst: data.sgst,
         grandTotal: billGrandTotal || data.grandTotal,
@@ -541,14 +541,7 @@ export default function RevenueForm() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormInput
-                  label="IGST (₹)"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter IGST amount"
-                  {...register('igst', { valueAsNumber: true })}
-                  error={errors.igst?.message}
-                />
+
                 <FormInput
                   label="CGST (₹)"
                   type="number"

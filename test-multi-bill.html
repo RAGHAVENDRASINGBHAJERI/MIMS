@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Item Bill Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .bill { border: 1px solid #ccc; margin: 20px 0; padding: 15px; }
+        .item { background: #f5f5f5; margin: 10px 0; padding: 10px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input, select { padding: 5px; margin: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Multi-Item Bill Report Test</h1>
+    
+    <div id="bills-container">
+        <!-- Bills will be dynamically added here -->
+    </div>
+    
+    <button onclick="addBill()">➕ Add New Bill</button>
+    <button onclick="exportToExcel()">📊 Export to Excel</button>
+    
+    <div id="totals" style="margin-top: 20px; font-weight: bold;">
+        <p>Overall Total: ₹<span id="overall-total">0.00</span></p>
+    </div>
+
+    <script>
+        let bills = [
+            {
+                billNo: 'BILL001',
+                billDate: '2024-01-15',
+                vendor: 'Tech Solutions Ltd',
+                items: [
+                    {
+                        particulars: 'Laptop Dell Inspiron',
+                        quantity: 2,
+                        rate: 45000,
+                        amount: 90000,
+                        cgst: 9,
+                        sgst: 9,
+                        grandTotal: 106200,
+                        remark: 'For IT Department'
+                    },
+                    {
+                        particulars: 'Wireless Mouse',
+                        quantity: 5,
+                        rate: 800,
+                        amount: 4000,
+                        cgst: 9,
+                        sgst: 9,
+                        grandTotal: 4720,
+                        remark: 'Accessories'
+                    }
+                ]
+            },
+            {
+                billNo: 'BILL002',
+                billDate: '2024-01-20',
+                vendor: 'Office Supplies Co',
+                items: [
+                    {
+                        particulars: 'Office Chair',
+                        quantity: 10,
+                        rate: 3500,
+                        amount: 35000,
+                        cgst: 9,
+                        sgst: 9,
+                        grandTotal: 41300,
+                        remark: 'Ergonomic chairs'
+                    }
+                ]
+            }
+        ];
+
+        function calculateItemTotals(item) {
+            const amount = item.quantity * item.rate;
+            const cgstAmount = (amount * item.cgst) / 100;
+            const sgstAmount = (amount * item.sgst) / 100;
+            const grandTotal = amount + cgstAmount + sgstAmount;
+            
+            return {
+                ...item,
+                amount,
+                grandTotal
+            };
+        }
+
+        function getBillTotal(bill) {
+            return bill.items.reduce((sum, item) => sum + item.grandTotal, 0);
+        }
+
+        function getOverallTotal() {
+            return bills.reduce((sum, bill) => sum + getBillTotal(bill), 0);
+        }
+
+        function updateTotals() {
+            document.getElementById('overall-total').textContent = getOverallTotal().toFixed(2);
+        }
+
+        function renderBills() {
+            const container = document.getElementById('bills-container');
+            container.innerHTML = '';
+            
+            bills.forEach((bill, billIndex) => {
+                const billDiv = document.createElement('div');
+                billDiv.className = 'bill';
+                billDiv.innerHTML = `
+                    <h3>Bill #${billIndex + 1}</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label>Bill Date:</label>
+                            <input type="date" value="${bill.billDate}" onchange="updateBill(${billIndex}, 'billDate', this.value)">
+                        </div>
+                        <div>
+                            <label>Bill No:</label>
+                            <input type="text" value="${bill.billNo}" onchange="updateBill(${billIndex}, 'billNo', this.value)">
+                        </div>
+                        <div>
+                            <label>Vendor:</label>
+                            <input type="text" value="${bill.vendor}" onchange="updateBill(${billIndex}, 'vendor', this.value)">
+                        </div>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Particulars</th>
+                                <th>Quantity</th>
+                                <th>Rate</th>
+                                <th>Amount</th>
+                                <th>CGST (%)</th>
+                                <th>SGST (%)</th>
+                                <th>Grand Total</th>
+                                <th>Remark</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${bill.items.map((item, itemIndex) => `
+                                <tr>
+                                    <td><input type="text" value="${item.particulars}" onchange="updateItem(${billIndex}, ${itemIndex}, 'particulars', this.value)"></td>
+                                    <td><input type="number" value="${item.quantity}" onchange="updateItem(${billIndex}, ${itemIndex}, 'quantity', parseFloat(this.value))"></td>
+                                    <td><input type="number" step="0.01" value="${item.rate}" onchange="updateItem(${billIndex}, ${itemIndex}, 'rate', parseFloat(this.value))"></td>
+                                    <td>₹${item.amount.toFixed(2)}</td>
+                                    <td><input type="number" step="0.01" value="${item.cgst}" onchange="updateItem(${billIndex}, ${itemIndex}, 'cgst', parseFloat(this.value))"></td>
+                                    <td><input type="number" step="0.01" value="${item.sgst}" onchange="updateItem(${billIndex}, ${itemIndex}, 'sgst', parseFloat(this.value))"></td>
+                                    <td style="font-weight: bold; color: #007bff;">₹${item.grandTotal.toFixed(2)}</td>
+                                    <td><input type="text" value="${item.remark}" onchange="updateItem(${billIndex}, ${itemIndex}, 'remark', this.value)"></td>
+                                    <td>
+                                        <button onclick="addItem(${billIndex})" style="background: #28a745; font-size: 12px; padding: 5px;">➕</button>
+                                        ${bill.items.length > 1 ? `<button onclick="removeItem(${billIndex}, ${itemIndex})" style="background: #dc3545; font-size: 12px; padding: 5px;">🗑️</button>` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    
+                    <div style="text-align: right; font-weight: bold; margin-top: 10px;">
+                        Bill Total: ₹${getBillTotal(bill).toFixed(2)}
+                    </div>
+                    
+                    ${bills.length > 1 ? `<button onclick="removeBill(${billIndex})" style="background: #dc3545; margin-top: 10px;">🗑️ Remove Bill</button>` : ''}
+                `;
+                container.appendChild(billDiv);
+            });
+            
+            updateTotals();
+        }
+
+        function updateBill(billIndex, field, value) {
+            bills[billIndex][field] = value;
+            renderBills();
+        }
+
+        function updateItem(billIndex, itemIndex, field, value) {
+            bills[billIndex].items[itemIndex][field] = value;
+            bills[billIndex].items[itemIndex] = calculateItemTotals(bills[billIndex].items[itemIndex]);
+            renderBills();
+        }
+
+        function addBill() {
+            bills.push({
+                billNo: '',
+                billDate: '',
+                vendor: '',
+                items: [{
+                    particulars: '',
+                    quantity: 0,
+                    rate: 0,
+                    amount: 0,
+                    cgst: 0,
+                    sgst: 0,
+                    grandTotal: 0,
+                    remark: ''
+                }]
+            });
+            renderBills();
+        }
+
+        function removeBill(billIndex) {
+            if (bills.length > 1) {
+                bills.splice(billIndex, 1);
+                renderBills();
+            }
+        }
+
+        function addItem(billIndex) {
+            bills[billIndex].items.push({
+                particulars: '',
+                quantity: 0,
+                rate: 0,
+                amount: 0,
+                cgst: 0,
+                sgst: 0,
+                grandTotal: 0,
+                remark: ''
+            });
+            renderBills();
+        }
+
+        function removeItem(billIndex, itemIndex) {
+            if (bills[billIndex].items.length > 1) {
+                bills[billIndex].items.splice(itemIndex, 1);
+                renderBills();
+            }
+        }
+
+        async function exportToExcel() {
+            try {
+                // This would normally call your backend API
+                console.log('Exporting bills data:', bills);
+                
+                // Simulate the Excel export structure
+                let slNo = 1;
+                const excelData = [];
+                
+                bills.forEach((bill) => {
+                    // Add bill header
+                    excelData.push({
+                        slNo: '',
+                        date: '',
+                        collegeIsr: '',
+                        itIsr: '',
+                        particulars: `Bill No: ${bill.billNo}`,
+                        vendor: bill.vendor,
+                        billDate: bill.billDate,
+                        billNo: '',
+                        quantity: '',
+                        rate: '',
+                        amount: '',
+                        cgst: '',
+                        sgst: '',
+                        grandTotal: '',
+                        remark: ''
+                    });
+                    
+                    // Add items
+                    bill.items.forEach((item) => {
+                        excelData.push({
+                            slNo: slNo++,
+                            date: '',
+                            collegeIsr: '',
+                            itIsr: '',
+                            particulars: item.particulars,
+                            vendor: bill.vendor,
+                            billDate: bill.billDate,
+                            billNo: bill.billNo,
+                            quantity: item.quantity,
+                            rate: item.rate,
+                            amount: item.amount,
+                            cgst: item.cgst,
+                            sgst: item.sgst,
+                            grandTotal: item.grandTotal,
+                            remark: item.remark
+                        });
+                    });
+                    
+                    // Add bill total
+                    excelData.push({
+                        slNo: '',
+                        particulars: '',
+                        grandTotal: `Bill Total: ₹${getBillTotal(bill).toFixed(2)}`
+                    });
+                    
+                    // Add empty row
+                    excelData.push({});
+                });
+                
+                // Add overall total
+                excelData.push({
+                    particulars: '',
+                    grandTotal: `Overall Total: ₹${getOverallTotal().toFixed(2)}`
+                });
+                
+                console.log('Excel data structure:', excelData);
+                alert(`Export successful! Check console for data structure.\nOverall Total: ₹${getOverallTotal().toFixed(2)}`);
+                
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed: ' + error.message);
+            }
+        }
+
+        // Initialize the page
+        renderBills();
+    </script>
+</body>
+</html>

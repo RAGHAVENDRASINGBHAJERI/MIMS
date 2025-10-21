@@ -186,33 +186,7 @@ export default function Reports() {
     }
   };
 
-  const exportToPDF = async () => {
-    setIsExporting(true);
-    try {
-      const blob = await reportService.exportToPDF(filters);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `asset-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
 
-      toast({
-        title: 'Success',
-        description: 'Report exported to PDF successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to export to PDF',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const downloadBills = async () => {
     setIsExporting(true);
@@ -466,11 +440,13 @@ export default function Reports() {
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(state.departments || []).map((dept) => (
-                    <SelectItem key={dept._id} value={dept._id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
+                  {(state.departments || [])
+                    .filter(dept => dept._id && dept.name && dept._id.trim() !== '' && dept.name.trim() !== '')
+                    .map((dept) => (
+                      <SelectItem key={dept._id} value={dept._id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -731,16 +707,7 @@ export default function Reports() {
                       </Button>
                     </motion.div>
                     
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        onClick={exportToPDF}
-                        disabled={isExporting}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export PDF
-                      </Button>
-                    </motion.div>
+
 
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <Button

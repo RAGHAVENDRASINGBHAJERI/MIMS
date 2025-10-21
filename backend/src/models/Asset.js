@@ -21,13 +21,13 @@ const assetSchema = new mongoose.Schema({
     required: [true, 'Category is required'],
     trim: true,
     enum: {
-      values: ['capital', 'revenue', 'consumable'],
-      message: 'Category must be capital, revenue, or consumable'
+      values: ['capital', 'revenue'],
+      message: 'Category must be capital or revenue'
     }
   },
   type: {
     type: String,
-    enum: ['capital', 'revenue', 'consumable'],
+    enum: ['capital', 'revenue'],
     default: 'capital'
   },
   // Legacy single-item fields (kept for backward compatibility)
@@ -98,11 +98,6 @@ const assetSchema = new mongoose.Schema({
   itISRNo: {
     type: String,
     trim: true
-  },
-  igst: {
-    type: Number,
-    default: 0,
-    min: [0, 'IGST cannot be negative']
   },
   cgst: {
     type: Number,
