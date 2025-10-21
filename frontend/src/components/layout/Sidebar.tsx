@@ -113,7 +113,7 @@ export function Sidebar() {
                       <Banknote className="h-5 w-5 text-emerald-400" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets || []).length}
+                      {(state.assets?.assets || []).length}
                     </p>
                   </div>
                   
@@ -123,7 +123,7 @@ export function Sidebar() {
                       <DollarSign className="h-5 w-5 text-white" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets || []).filter(asset => asset.type === 'capital').length}
+                      {(state.assets?.assets || []).filter(asset => asset.type === 'capital').length}
                     </p>
                   </div>
                   
@@ -133,7 +133,7 @@ export function Sidebar() {
                       <TrendingUp className="h-5 w-5 text-white" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets || []).filter(asset => asset.type === 'revenue').length}
+                      {(state.assets?.assets || []).filter(asset => asset.type === 'revenue').length}
                     </p>
                   </div>
                 </div>
