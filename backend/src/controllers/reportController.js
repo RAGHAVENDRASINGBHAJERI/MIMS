@@ -5,7 +5,9 @@ import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import JSZip from 'jszip';
+import archiver from 'archiver';
 import { getGridFS } from '../utils/gridfs.js';
+import PDFDocument from 'pdfkit';
 
 export const getDepartmentReport = async (req, res, next) => {
   try {
@@ -27,6 +29,7 @@ export const getDepartmentReport = async (req, res, next) => {
 
     res.json({
       success: true,
+      message: 'Department report generated successfully',
       data: {
         summary: {
           totalCapital,
@@ -69,6 +72,7 @@ export const getVendorReport = async (req, res, next) => {
 
     res.json({
       success: true,
+      message: 'Vendor report generated successfully',
       data: {
         summary: {
           totalCapital: 0, // Vendors don't have capital/revenue distinction
@@ -104,6 +108,7 @@ export const getItemReport = async (req, res, next) => {
 
     res.json({
       success: true,
+      message: 'Item report generated successfully',
       data: {
         summary: {
           totalCapital,
@@ -145,6 +150,7 @@ export const getYearReport = async (req, res, next) => {
 
     res.json({
       success: true,
+      message: 'Year report generated successfully',
       data: {
         summary: {
           totalCapital: report.reduce((sum, year) => sum + year.totalCapital, 0),
@@ -315,7 +321,7 @@ export const exportExcel = async (req, res, next) => {
     }
 
     // Map report data to flat objects for Excel rows
-    const rows = report.map(item => {
+    const rows = report.flatMap(item => {
       if (type === 'vendor') {
         return {
           _id: item._id || '',
@@ -335,13 +341,33 @@ export const exportExcel = async (req, res, next) => {
           count: item.count || ''
         };
       }
-      return {
-        slNo: report.indexOf(item) + 1,
+      // Flatten items per bill; if no items array, fallback to legacy fields
+      if (Array.isArray(item.items) && item.items.length > 0) {
+        return item.items.map((sub, idx) => ({
+          slNo: idx + 1,
+          date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
+          collegeISRNo: item.collegeISRNo || '',
+          itISRNo: item.itISRNo || '',
+          particulars: sub.particulars || '',
+          vendor: item.vendorName || item.vendor || '',
+          billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
+          billNo: item.billNo || '',
+          quantity: sub.quantity || '',
+          rate: sub.rate || '',
+          amount: sub.amount || '',
+          cgst: sub.cgst || '',
+          sgst: sub.sgst || '',
+          grandTotal: sub.grandTotal || '',
+          remark: item.remark || ''
+        }));
+      }
+      return [{
+        slNo: 1,
         date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
         collegeISRNo: item.collegeISRNo || '',
         itISRNo: item.itISRNo || '',
         particulars: item.itemName || '',
-        vendor: item.vendorName || '',
+        vendor: item.vendorName || item.vendor || '',
         billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
         billNo: item.billNo || '',
         quantity: item.quantity || '',
@@ -351,7 +377,7 @@ export const exportExcel = async (req, res, next) => {
         sgst: item.sgst || '',
         grandTotal: item.grandTotal || '',
         remark: item.remark || ''
-      };
+      }];
     });
 
     console.log('Excel worksheet columns:', worksheet.columns.map(c => c.key));
@@ -361,10 +387,10 @@ export const exportExcel = async (req, res, next) => {
 
     // Add total row for combined report at the end
     if (summary) {
-      const totalAmount = report.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
-      const totalCGST = report.reduce((sum, item) => sum + (item.cgst || 0), 0);
-      const totalSGST = report.reduce((sum, item) => sum + (item.sgst || 0), 0);
-      const totalGrandTotal = report.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
+      const totalAmount = rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+      const totalCGST = rows.reduce((sum, row) => sum + (Number(row.cgst) || 0), 0);
+      const totalSGST = rows.reduce((sum, row) => sum + (Number(row.sgst) || 0), 0);
+      const totalGrandTotal = rows.reduce((sum, row) => sum + (Number(row.grandTotal) || 0), 0);
 
       worksheet.addRow({}); // Empty row for separation
       worksheet.addRow({
@@ -590,6 +616,7 @@ export const getCombinedReport = async (req, res, next) => {
 
     res.json({
       success: true,
+      message: 'Combined report generated successfully',
       data: {
         summary: {
           totalCapital,
@@ -600,6 +627,159 @@ export const getCombinedReport = async (req, res, next) => {
         assets
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const exportPDF = async (req, res, next) => {
+  try {
+    const { departmentId, type, startDate, endDate } = req.query;
+
+    const filterQuery = {};
+
+    if (departmentId) {
+      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+    }
+
+    if (type) {
+      filterQuery.type = type;
+    }
+
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
+    }
+
+    const assets = await Asset.find(filterQuery)
+      .populate('department', 'name')
+      .lean()
+      .sort({ billDate: -1 });
+
+    // Flatten items for PDF
+    const flattenedRows = assets.flatMap(asset => {
+      if (Array.isArray(asset.items) && asset.items.length > 0) {
+        return asset.items.map((item, idx) => ({
+          slNo: idx + 1,
+          date: asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '',
+          collegeISRNo: asset.collegeISRNo || '',
+          itISRNo: asset.itISRNo || '',
+          particulars: item.particulars || '',
+          vendor: asset.vendorName || asset.vendor || '',
+          billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+          billNo: asset.billNo || '',
+          quantity: item.quantity || '',
+          rate: item.rate || '',
+          amount: item.amount || '',
+          cgst: item.cgst || '',
+          sgst: item.sgst || '',
+          grandTotal: item.grandTotal || '',
+          remark: asset.remark || ''
+        }));
+      }
+      return [{
+        slNo: 1,
+        date: asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : '',
+        collegeISRNo: asset.collegeISRNo || '',
+        itISRNo: asset.itISRNo || '',
+        particulars: asset.itemName || '',
+        vendor: asset.vendorName || asset.vendor || '',
+        billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+        billNo: asset.billNo || '',
+        quantity: asset.quantity || '',
+        rate: asset.pricePerItem || '',
+        amount: asset.totalAmount || '',
+        cgst: asset.cgst || '',
+        sgst: asset.sgst || '',
+        grandTotal: asset.grandTotal || '',
+        remark: asset.remark || ''
+      }];
+    });
+
+    const doc = new PDFDocument({ margin: 50 });
+    const filename = `assets_report_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).text('AssetFlow Report', { align: 'center' });
+    doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // Table headers
+    const headers = ['Sl No', 'Date', 'College ISR', 'IT ISR', 'Particulars', 'Vendor', 'Bill Date', 'Bill No', 'Qty', 'Rate', 'Amount', 'CGST', 'SGST', 'Grand Total', 'Remark'];
+    const colWidths = [40, 60, 80, 80, 120, 100, 80, 80, 40, 60, 80, 50, 50, 80, 100];
+    let x = 50;
+
+    headers.forEach((header, i) => {
+      doc.fontSize(8).text(header, x, doc.y, { width: colWidths[i], align: 'left' });
+      x += colWidths[i];
+    });
+
+    doc.moveDown(1);
+    doc.line(50, doc.y, 50 + colWidths.reduce((a, b) => a + b, 0), doc.y);
+    doc.moveDown(0.5);
+
+    // Table rows
+    flattenedRows.forEach(row => {
+      x = 50;
+      const rowData = [
+        row.slNo.toString(),
+        row.date,
+        row.collegeISRNo,
+        row.itISRNo,
+        row.particulars,
+        row.vendor,
+        row.billDate,
+        row.billNo,
+        row.quantity.toString(),
+        row.rate.toString(),
+        row.amount.toString(),
+        row.cgst.toString(),
+        row.sgst.toString(),
+        row.grandTotal.toString(),
+        row.remark
+      ];
+
+      rowData.forEach((data, i) => {
+        doc.fontSize(7).text(data || '', x, doc.y, { width: colWidths[i], align: 'left' });
+        x += colWidths[i];
+      });
+
+      doc.moveDown(0.8);
+
+      // Add new page if needed
+      if (doc.y > 700) {
+        doc.addPage();
+      }
+    });
+
+    // Add totals
+    const totalAmount = flattenedRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const totalCGST = flattenedRows.reduce((sum, row) => sum + (Number(row.cgst) || 0), 0);
+    const totalSGST = flattenedRows.reduce((sum, row) => sum + (Number(row.sgst) || 0), 0);
+    const totalGrandTotal = flattenedRows.reduce((sum, row) => sum + (Number(row.grandTotal) || 0), 0);
+
+    doc.moveDown(1);
+    doc.line(50, doc.y, 50 + colWidths.reduce((a, b) => a + b, 0), doc.y);
+    doc.moveDown(0.5);
+
+    x = 50;
+    const totalRow = ['', '', '', '', 'TOTAL', '', '', '', '', '', totalAmount.toString(), totalCGST.toString(), totalSGST.toString(), totalGrandTotal.toString(), ''];
+    totalRow.forEach((data, i) => {
+      doc.fontSize(8).text(data || '', x, doc.y, { width: colWidths[i], align: 'left' });
+      x += colWidths[i];
+    });
+
+    doc.end();
   } catch (error) {
     next(error);
   }
@@ -632,40 +812,70 @@ export const exportBillsZip = async (req, res, next) => {
     const assets = await Asset.find(filterQuery).populate('department', 'name').lean();
 
     if (assets.length === 0) {
-      return res.status(404).json({ success: false, message: 'No assets found with bills' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No assets found with bills',
+        data: null 
+      });
     }
 
-    const zip = new JSZip();
-    const gfs = getGridFS();
+    // Set response headers for ZIP download
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="bills_${new Date().toISOString().split('T')[0]}.zip"`);
 
+    // Create archiver instance
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    // Handle archiver events
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Error creating ZIP file',
+          error: err.message 
+        });
+      }
+    });
+
+    // Pipe archive to response
+    archive.pipe(res);
+
+    const gfs = getGridFS();
+    let filesAdded = 0;
+
+    // Process each asset with a bill file
     for (const asset of assets) {
       if (asset.billFileId) {
         try {
           const downloadStream = gfs.openDownloadStream(asset.billFileId);
-          const chunks = [];
-
-          await new Promise((resolve, reject) => {
-            downloadStream.on('data', (chunk) => chunks.push(chunk));
-            downloadStream.on('error', reject);
-            downloadStream.on('end', resolve);
-          });
-
-          const buffer = Buffer.concat(chunks);
-          const filename = `${asset.itemName}_${asset.billNo || asset._id}.pdf`;
-          zip.file(filename, buffer);
+          
+          // Create a readable stream for archiver
+          const fileExtension = 'pdf'; // Default to PDF, could be determined from metadata
+          const filename = `${asset.itemName || 'Asset'}_${asset.billNo || asset._id}.${fileExtension}`;
+          
+          // Add file to archive
+          archive.append(downloadStream, { name: filename });
+          filesAdded++;
+          
         } catch (fileError) {
-          console.error(`Error downloading file for asset ${asset._id}:`, fileError);
+          console.error(`Error processing file for asset ${asset._id}:`, fileError);
           // Continue with other files
         }
       }
     }
 
-    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    // Finalize the archive
+    await archive.finalize();
 
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="bills.zip"');
-    res.send(zipBuffer);
+    console.log(`Successfully created ZIP with ${filesAdded} files`);
+
   } catch (error) {
-    next(error);
+    console.error('Export bills ZIP error:', error);
+    if (!res.headersSent) {
+      next(error);
+    }
   }
 };

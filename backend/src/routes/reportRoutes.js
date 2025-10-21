@@ -6,6 +6,7 @@ import {
   getItemReport,
   getYearReport,
   exportExcel,
+  exportPDF,
   exportWord,
   exportBillsZip,
   getCombinedReport
@@ -31,6 +32,9 @@ router.get('/year', protect, getYearReport);
 
 // GET /api/reports/export/excel - Export Excel
 router.get('/export/excel', protect, exportExcel);
+
+// GET /api/reports/export/pdf - Export PDF
+router.get('/export/pdf', protect, exportPDF);
 
 // GET /api/reports/export/word - Export Word
 router.get('/export/word', protect, exportWord);

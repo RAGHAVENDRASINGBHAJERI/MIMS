@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
 
+const itemSchema = new mongoose.Schema({
+  particulars: { type: String, trim: true },
+  quantity: { type: Number, min: [0, 'Quantity cannot be negative'] },
+  rate: { type: Number, min: [0, 'Rate cannot be negative'] },
+  cgst: { type: Number, default: 0, min: [0, 'CGST cannot be negative'] },
+  sgst: { type: Number, default: 0, min: [0, 'SGST cannot be negative'] },
+  amount: { type: Number, default: 0 },
+  grandTotal: { type: Number, default: 0 }
+}, { _id: false });
+
 const assetSchema = new mongoose.Schema({
   department: {
     type: mongoose.Schema.Types.ObjectId,
@@ -9,31 +19,43 @@ const assetSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Category is required'],
-    trim: true
+    trim: true,
+    enum: {
+      values: ['capital', 'revenue', 'consumable'],
+      message: 'Category must be capital, revenue, or consumable'
+    }
   },
   type: {
     type: String,
     enum: ['capital', 'revenue', 'consumable'],
     default: 'capital'
   },
+  // Legacy single-item fields (kept for backward compatibility)
   itemName: {
     type: String,
-    required: [true, 'Item name is required'],
     trim: true
   },
   quantity: {
     type: Number,
-    required: [true, 'Quantity is required'],
-    min: [1, 'Quantity must be at least 1']
+    min: [0, 'Quantity cannot be negative']
   },
   pricePerItem: {
     type: Number,
-    required: [true, 'Price per item is required'],
     min: [0, 'Price cannot be negative']
   },
   totalAmount: {
     type: Number,
-    required: true
+    default: 0
+  },
+  // Multi-item support
+  items: {
+    type: [itemSchema],
+    default: []
+  },
+  // Support vendor field while keeping legacy vendorName compatibility
+  vendor: {
+    type: String,
+    trim: true
   },
   vendorName: {
     type: String,
@@ -104,9 +126,34 @@ const assetSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Calculate total amount before saving
+// Calculate totals before saving
 assetSchema.pre('save', function(next) {
-  this.totalAmount = this.quantity * this.pricePerItem;
+  // Keep vendor and vendorName in sync
+  if (!this.vendor && this.vendorName) {
+    this.vendor = this.vendorName;
+  }
+  if (!this.vendorName && this.vendor) {
+    this.vendorName = this.vendor;
+  }
+
+  if (Array.isArray(this.items) && this.items.length > 0) {
+    // Ensure each item has derived totals
+    this.items = this.items.map((item) => {
+      const amount = (Number(item.quantity) || 0) * (Number(item.rate) || 0);
+      const tax = amount * ((Number(item.cgst) || 0) + (Number(item.sgst) || 0)) / 100;
+      return {
+        ...item.toObject ? item.toObject() : item,
+        amount,
+        grandTotal: amount + tax
+      };
+    });
+    this.totalAmount = this.items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+    if (!this.grandTotal) {
+      this.grandTotal = this.items.reduce((sum, it) => sum + (Number(it.grandTotal) || 0), 0);
+    }
+  } else if (this.quantity != null && this.pricePerItem != null) {
+    this.totalAmount = (Number(this.quantity) || 0) * (Number(this.pricePerItem) || 0);
+  }
   next();
 });
 

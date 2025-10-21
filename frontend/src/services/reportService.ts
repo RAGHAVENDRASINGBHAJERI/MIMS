@@ -46,7 +46,7 @@ export const reportService = {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || result.error || `HTTP error! status: ${response.status}`);
     }
 
     return {
@@ -86,7 +86,7 @@ export const reportService = {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || result.error || `HTTP error! status: ${response.status}`);
     }
 
     return {
@@ -126,7 +126,7 @@ export const reportService = {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || result.error || `HTTP error! status: ${response.status}`);
     }
 
     return {
@@ -161,7 +161,7 @@ export const reportService = {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || result.error || `HTTP error! status: ${response.status}`);
     }
 
     return {
@@ -195,7 +195,7 @@ export const reportService = {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      throw new Error(result.message || result.error || `HTTP error! status: ${response.status}`);
     }
 
     return result.data;
@@ -243,6 +243,30 @@ export const reportService = {
     return response.blob();
   },
 
+  // Export report to PDF
+  exportToPDF: async (filters: ReportFilters = {}): Promise<Blob> => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && key !== 'academicYear') {
+        params.append(key, value);
+      }
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/reports/export/pdf?${params.toString()}`, { headers });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
   // Download bills as ZIP
   downloadBills: async (selectedAssetIds: string[], filters: ReportFilters = {}): Promise<Blob> => {
     const token = localStorage.getItem('token');
@@ -265,7 +289,7 @@ export const reportService = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     return response.blob();

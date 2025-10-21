@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useAssetFlow } from '@/context/AssetFlowContext';
+import { useAuth } from '@/context/AuthContext';
 import { departmentService } from '@/services/departmentService';
 import { reportService, type ReportFilters } from '@/services/reportService';
 import { assetService, type Asset, type AssetFormData } from '@/services/assetService';
@@ -50,6 +51,7 @@ export default function Reports() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { state, dispatch } = useAssetFlow();
+  const { user, isAdmin, isChiefAdministrativeOfficer } = useAuth();
   const [filters, setFilters] = useState<ReportFilters>({});
   const [reportData, setReportData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +67,11 @@ export default function Reports() {
       try {
         const departments = await departmentService.getAllDepartments();
         dispatch({ type: 'SET_DEPARTMENTS', payload: departments });
+        
+        // Set initial department filter based on user role
+        if (!isAdmin && !isChiefAdministrativeOfficer && user?.department?._id) {
+          setFilters(prev => ({ ...prev, departmentId: user.department._id }));
+        }
       } catch (error) {
         console.error('Failed to load departments:', error);
         toast({
@@ -76,7 +83,7 @@ export default function Reports() {
     };
 
     fetchDepartments();
-  }, [dispatch, toast]);
+  }, [dispatch, toast, user, isAdmin, isChiefAdministrativeOfficer]);
 
   useEffect(() => {
     generateReport(false);
@@ -103,19 +110,27 @@ export default function Reports() {
           reportData = await reportService.generateReport(filters);
       }
 
-      // Set summary for all report types if available
-      if (reportData.data) {
-        if (reportData.data.totalCapital !== undefined) {
-          reportData.summary = {
-            totalCapital: reportData.data.totalCapital,
-            totalRevenue: reportData.data.totalRevenue,
-            grandTotal: reportData.data.grandTotal,
-            itemCount: reportData.data.report ? reportData.data.report.length : (reportData.data.assets ? reportData.data.assets.length : 0)
-          };
-        }
+      // Ensure reportData has the expected structure
+      if (!reportData) {
+        throw new Error('No data received from server');
       }
 
-      if ((!reportData.assets || reportData.assets.length === 0) && (!reportData.report || reportData.report.length === 0)) {
+      // Set summary for all report types if available
+      if (reportData.data && reportData.data.summary) {
+        reportData.summary = {
+          totalCapital: reportData.data.summary.totalCapital || 0,
+          totalRevenue: reportData.data.summary.totalRevenue || 0,
+          grandTotal: reportData.data.summary.grandTotal || 0,
+          itemCount: reportData.data.summary.itemCount || 0
+        };
+      }
+
+      const hasData = (reportData.data?.assets && reportData.data.assets.length > 0) || 
+                     (reportData.data?.report && reportData.data.report.length > 0) ||
+                     (reportData.assets && reportData.assets.length > 0) ||
+                     (reportData.report && reportData.report.length > 0);
+      
+      if (!hasData) {
         toast({
           title: 'Warning',
           description: 'No data found for the selected filters.',
@@ -164,6 +179,62 @@ export default function Reports() {
       toast({
         title: 'Error',
         description: 'Failed to export to Excel',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await reportService.exportToPDF(filters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `asset-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Report exported to PDF successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export to PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const downloadBills = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await reportService.downloadBills([], filters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bills-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Bills downloaded successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to download bills',
         variant: 'destructive',
       });
     } finally {
@@ -485,7 +556,9 @@ export default function Reports() {
                   whileHover={{ scale: 1.05 }}
                   className="text-center p-4 bg-primary/5 rounded-lg"
                 >
-                  <p className="text-2xl font-bold text-primary">{reportData?.data?.assets?.length || (state.assets || []).length || 0}</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {(reportData?.data?.assets || reportData?.assets || []).length || (state.assets || []).length || 0}
+                  </p>
                   <p className="text-sm text-muted-foreground">Total Assets</p>
                 </motion.div>
                 <motion.div
@@ -494,7 +567,7 @@ export default function Reports() {
                   className="text-center p-4 bg-success/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-success">
-                    {((reportData?.data?.assets || []).filter((asset: any) => asset.type === 'capital').length || (state.assets || []).filter((asset: any) => asset.type === 'capital').length) || 0}
+                    {((reportData?.data?.assets || reportData?.assets || []).filter((asset: any) => asset.type === 'capital').length || (state.assets || []).filter((asset: any) => asset.type === 'capital').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Capital Assets</p>
                 </motion.div>
@@ -504,7 +577,7 @@ export default function Reports() {
                   className="text-center p-4 bg-info/5 rounded-lg"
                 >
                   <p className="text-2xl font-bold text-info">
-                    {((reportData?.data?.assets || []).filter((asset: any) => asset.type === 'revenue').length || (state.assets || []).filter((asset: any) => asset.type === 'revenue').length) || 0}
+                    {((reportData?.data?.assets || reportData?.assets || []).filter((asset: any) => asset.type === 'revenue').length || (state.assets || []).filter((asset: any) => asset.type === 'revenue').length) || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Revenue Assets</p>
                 </motion.div>
@@ -556,37 +629,29 @@ export default function Reports() {
                     />
                   </div>
                 )}
-                {reportType === 'department' && (
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <Select value={filters.departmentId} onValueChange={(value) => setFilters({ ...filters, departmentId: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All departments" />
-                      </SelectTrigger>
-                      <SelectContent>
-                    <SelectItem value={null}>All Departments</SelectItem>
-                    {(state.departments || []).filter(dept => dept._id && dept.name).map((dept) => (
-                      <SelectItem key={dept._id} value={dept._id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label>Department</Label>
-                  <Select value={filters.departmentId} onValueChange={(value) => setFilters({ ...filters, departmentId: value })}>
+                  <Select value={filters.departmentId || ''} onValueChange={(value) => setFilters({ ...filters, departmentId: value || undefined })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All departments" />
+                      <SelectValue placeholder={isAdmin || isChiefAdministrativeOfficer ? "All departments" : "Your department"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={null}>All Departments</SelectItem>
-                      {(state.departments || []).filter(dept => dept._id && dept.name).map((dept) => (
-                        <SelectItem key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
+                      {(isAdmin || isChiefAdministrativeOfficer) && (
+                        <SelectItem value="">All Departments</SelectItem>
+                      )}
+                      {(state.departments || [])
+                        .filter(dept => {
+                          // For non-admin users, only show their department
+                          if (!isAdmin && !isChiefAdministrativeOfficer) {
+                            return dept._id === user?.department?._id;
+                          }
+                          return dept._id && dept.name;
+                        })
+                        .map((dept) => (
+                          <SelectItem key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -610,12 +675,14 @@ export default function Reports() {
                     <FormInput
                       type="date"
                       placeholder="From"
-                      onChange={(e) => setFilters({ ...filters, startDate: e.target.value, academicYear: undefined })}
+                      value={filters.startDate || ''}
+                      onChange={(e) => setFilters({ ...filters, startDate: e.target.value || undefined })}
                     />
                     <FormInput
                       type="date"
                       placeholder="To"
-                      onChange={(e) => setFilters({ ...filters, endDate: e.target.value, academicYear: undefined })}
+                      value={filters.endDate || ''}
+                      onChange={(e) => setFilters({ ...filters, endDate: e.target.value || undefined })}
                     />
                   </div>
                 </div>
@@ -623,7 +690,7 @@ export default function Reports() {
               
               <div className="flex gap-4 mt-6">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button onClick={() => handleGenerateReportClick()} disabled={isLoading}>
+                  <Button onClick={() => handleGenerateReportClick()} disabled={isLoading}>
                     {isLoading ? (
                       <Loader size="sm" text="Generating..." />
                     ) : (
@@ -632,6 +699,22 @@ export default function Reports() {
                         Generate Report
                       </>
                     )}
+                  </Button>
+                </motion.div>
+                
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setFilters({});
+                      if (!isAdmin && !isChiefAdministrativeOfficer && user?.department?._id) {
+                        setFilters({ departmentId: user.department._id });
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Clear Filters
                   </Button>
                 </motion.div>
                 
@@ -648,6 +731,27 @@ export default function Reports() {
                       </Button>
                     </motion.div>
                     
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="outline"
+                        onClick={exportToPDF}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export PDF
+                      </Button>
+                    </motion.div>
+
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="outline"
+                        onClick={downloadBills}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Bills
+                      </Button>
+                    </motion.div>
 
                   </>
                 )}
@@ -797,7 +901,9 @@ export default function Reports() {
               </h3>
 
               {(() => {
-                const data = reportType === 'combined' || reportType === 'department' ? (reportData?.assets || []) : (reportData?.report || []);
+                const data = reportType === 'combined' || reportType === 'department' ? 
+                  (reportData?.data?.assets || reportData?.assets || []) : 
+                  (reportData?.data?.report || reportData?.report || []);
                 const hasData = data.length > 0;
 
                 if (!hasData) {

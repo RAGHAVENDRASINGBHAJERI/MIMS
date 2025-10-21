@@ -67,6 +67,24 @@ export default function RevenueForm() {
   const { user, isAdmin, isChiefAdministrativeOfficer } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [items, setItems] = useState<Array<{ particulars: string; quantity: number; rate: number; cgst: number; sgst: number; amount: number; grandTotal: number }>>([
+    { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }
+  ]);
+
+  // Auto-calc item totals
+  useEffect(() => {
+    const updated = items.map((item) => {
+      const amount = (Number(item.quantity) || 0) * (Number(item.rate) || 0);
+      const tax = amount * (((Number(item.cgst) || 0) + (Number(item.sgst) || 0)) / 100);
+      return { ...item, amount, grandTotal: amount + tax };
+    });
+    const changed = updated.some((u, i) => u.amount !== items[i].amount || u.grandTotal !== items[i].grandTotal);
+    if (changed) setItems(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(items.map(i => ({ q: i.quantity, r: i.rate, c: i.cgst, s: i.sgst })))]);
+
+  const billTotalAmount = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+  const billGrandTotal = items.reduce((sum, it) => sum + (Number(it.grandTotal) || 0), 0);
 
   const {
     register,
@@ -146,8 +164,9 @@ export default function RevenueForm() {
         igst: data.igst,
         cgst: data.cgst,
         sgst: data.sgst,
-        grandTotal: data.grandTotal,
+        grandTotal: billGrandTotal || data.grandTotal,
         remark: data.remark,
+        items,
       };
 
       console.log('Asset data to send:', assetData);
@@ -270,6 +289,40 @@ export default function RevenueForm() {
               </div>
             </motion.div>
 
+            {/* Bill Totals */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <Calculator className="h-4 w-4 text-teal-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Bill Totals</h3>
+                  <p className="text-sm text-gray-600">Aggregated from all items.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormInput
+                  label="Total Amount (₹)"
+                  type="number"
+                  value={billTotalAmount}
+                  readOnly
+                  className="bg-gray-50"
+                />
+                <FormInput
+                  label="Grand Total (₹)"
+                  type="number"
+                  value={billGrandTotal}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+            </motion.div>
+
             {/* Item Details Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -343,46 +396,54 @@ export default function RevenueForm() {
 
 
 
-                <FormInput
-                  label="Item Name *"
-                  placeholder="Enter item name"
-                  {...register('itemName', { required: true })}
-                  error={errors.itemName?.message}
-                  autoComplete="off"
-                />
-
-                <FormInput
-                  label="Quantity *"
-                  type="number"
-                  placeholder="Enter quantity"
-                  {...register('quantity', { 
-                    required: true, 
-                    valueAsNumber: true,
-                    min: { value: 1, message: 'Quantity must be at least 1' }
-                  })}
-                  error={errors.quantity?.message}
-                />
-
-                <FormInput
-                  label="Cost per Item (₹) *"
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter cost per item"
-                  {...register('pricePerItem', { 
-                    required: true, 
-                    valueAsNumber: true,
-                    min: { value: 0, message: 'Price must be positive' }
-                  })}
-                  error={errors.pricePerItem?.message}
-                />
-
-                <FormInput
-                  label="Total Cost (₹)"
-                  type="number"
-                  value={totalAmount}
-                  readOnly
-                  className="bg-gray-50"
-                />
+                {/* Dynamic Items */}
+                <div className="col-span-1 md:col-span-2 space-y-4">
+                  {items.map((it, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+                      <FormInput
+                        label="Particulars"
+                        value={it.particulars}
+                        onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, particulars: e.target.value } : x))}
+                      />
+                      <FormInput
+                        label="Qty"
+                        type="number"
+                        value={it.quantity}
+                        onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, quantity: Number(e.target.value) } : x))}
+                      />
+                      <FormInput
+                        label="Rate"
+                        type="number"
+                        value={it.rate}
+                        onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, rate: Number(e.target.value) } : x))}
+                      />
+                      <FormInput
+                        label="CGST%"
+                        type="number"
+                        value={it.cgst}
+                        onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, cgst: Number(e.target.value) } : x))}
+                      />
+                      <FormInput
+                        label="SGST%"
+                        type="number"
+                        value={it.sgst}
+                        onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, sgst: Number(e.target.value) } : x))}
+                      />
+                      <div>
+                        <Label>Total</Label>
+                        <div className="h-10 rounded-md border bg-gray-50 px-3 flex items-center">
+                          ₹{(it.grandTotal || 0).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="md:col-span-6 flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                        {items.length > 1 && (
+                          <Button type="button" variant="destructive" onClick={() => setItems(items.filter((_, i) => i !== idx))}>Remove</Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
 

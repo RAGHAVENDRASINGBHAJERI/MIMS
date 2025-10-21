@@ -13,7 +13,8 @@ export const protect = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: 'Not authorized, no token'
+        message: 'Not authorized, no token',
+        data: null
       });
     }
 
@@ -27,7 +28,8 @@ export const protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({
           success: false,
-          error: 'Not authorized, user not found'
+          message: 'Not authorized, user not found',
+          data: null
         });
       }
 
@@ -36,7 +38,8 @@ export const protect = async (req, res, next) => {
       console.error('Token verification error:', error);
       return res.status(401).json({
         success: false,
-        error: 'Not authorized, token failed'
+        message: 'Not authorized, token failed',
+        data: null
       });
     }
   } catch (error) {
@@ -50,14 +53,16 @@ export const authorize = (...roles) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: 'Not authorized'
+        message: 'Not authorized',
+        data: null
       });
     }
 
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        error: 'User role not authorized for this action'
+        message: 'User role not authorized for this action',
+        data: null
       });
     }
 

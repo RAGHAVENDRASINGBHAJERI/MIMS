@@ -24,9 +24,9 @@ export interface Asset {
 }
 
 export interface AssetFormData {
-  itemName: string;
-  quantity: number;
-  pricePerItem: number;
+  itemName?: string;
+  quantity?: number;
+  pricePerItem?: number;
   vendorName: string;
   vendorAddress: string;
   contactNumber: string;
@@ -44,6 +44,15 @@ export interface AssetFormData {
   sgst?: number;
   grandTotal?: number;
   remark?: string;
+  items?: Array<{
+    particulars: string;
+    quantity: number;
+    rate: number;
+    cgst: number;
+    sgst: number;
+    amount?: number;
+    grandTotal?: number;
+  }>;
 }
 
 export interface AssetListResponse {
@@ -113,6 +122,8 @@ export const assetService = {
       if (key === 'billFile' && value instanceof File) {
         console.log('Adding file to FormData:', key, value.name, value.size);
         formData.append('billFile', value);
+      } else if (key === 'items' && Array.isArray(value)) {
+        formData.append('items', JSON.stringify(value));
       } else if (value !== undefined && value !== null) {
         console.log('Adding field to FormData:', key, value);
         formData.append(key, value.toString());

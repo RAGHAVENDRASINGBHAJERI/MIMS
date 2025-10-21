@@ -22,7 +22,7 @@ export const createAsset = async (req, res, next) => {
     } : 'No file');
     console.log('Request headers:', req.headers);
 
-    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
+    const { department, category, itemName, quantity, pricePerItem, vendor, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark, items } = req.body;
 
     if (!req.file) {
       console.log('ERROR: No file provided');
@@ -38,18 +38,29 @@ export const createAsset = async (req, res, next) => {
     console.log('File uploaded with ID:', fileId);
 
     console.log('Creating asset in database...');
-    const quantityNum = parseInt(quantity);
-    const priceNum = parseFloat(pricePerItem);
-    const totalAmount = quantityNum * priceNum;
+    const quantityNum = quantity !== undefined ? parseFloat(quantity) : undefined;
+    const priceNum = pricePerItem !== undefined ? parseFloat(pricePerItem) : undefined;
+    const singleTotalAmount = quantityNum != null && priceNum != null ? quantityNum * priceNum : 0;
+
+    // Parse items if provided (could arrive as JSON string via multipart)
+    let parsedItems = [];
+    if (items) {
+      try {
+        parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+      } catch (e) {
+        console.warn('Failed to parse items, expected JSON array or array:', e.message);
+      }
+    }
 
     const asset = await Asset.create({
       department,
-      category,
+      category: (category || '').toString().toLowerCase(),
       itemName,
       quantity: quantityNum,
       pricePerItem: priceNum,
-      totalAmount: totalAmount,
-      vendorName,
+      items: parsedItems,
+      vendorName: vendorName || vendor,
+      vendor: vendor || vendorName,
       vendorAddress,
       contactNumber,
       email,
@@ -62,7 +73,7 @@ export const createAsset = async (req, res, next) => {
       igst: igst ? parseFloat(igst) : 0,
       cgst: cgst ? parseFloat(cgst) : 0,
       sgst: sgst ? parseFloat(sgst) : 0,
-      grandTotal: grandTotal ? parseFloat(grandTotal) : totalAmount,
+      grandTotal: grandTotal ? parseFloat(grandTotal) : singleTotalAmount,
       remark
     });
     console.log('Asset created:', asset);
