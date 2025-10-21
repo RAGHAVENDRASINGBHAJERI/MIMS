@@ -593,15 +593,15 @@ export default function CapitalForm() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">Receipt Upload</h3>
-                  <p className="text-sm text-gray-600">Upload receipt document (PDF or Image, max 5MB).</p>
+                  <p className="text-sm text-gray-600">Upload receipt document (PDF only, max 10MB).</p>
                 </div>
               </div>
               <div className="max-w-md">
                 <UploadField
                   label="Receipt File"
                   onFileSelect={setSelectedFile}
-                  accept={{ "application/pdf": [".pdf"], "image/*": [".jpg", ".jpeg", ".png"] }}
-                  maxSize={5 * 1024 * 1024}
+                  accept={{ "application/pdf": [".pdf"] }}
+                  maxSize={10 * 1024 * 1024}
                   required
                 />
               </div>

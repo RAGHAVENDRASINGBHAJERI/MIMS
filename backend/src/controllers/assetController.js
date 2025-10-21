@@ -3,9 +3,22 @@ import mongoose from 'mongoose';
 import { uploadFile, downloadFile } from '../utils/gridfs.js';
 import multer from 'multer';
 
-// Configure multer for memory storage
+// Configure multer for memory storage with PDF-only restriction
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    // Only allow PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 // 10MB default
+  }
+});
 
 export const uploadMiddleware = upload.single('billFile');
 
@@ -21,6 +34,14 @@ export const createAsset = async (req, res, next) => {
       size: req.file.size
     } : 'No file');
     console.log('Request headers:', req.headers);
+
+    // Handle multer errors (file type, size, etc.)
+    if (req.fileError) {
+      return res.status(400).json({
+        success: false,
+        error: req.fileError.message || 'File upload error'
+      });
+    }
 
     const { department, category, itemName, quantity, pricePerItem, vendor, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark, items } = req.body;
 
@@ -54,7 +75,7 @@ export const createAsset = async (req, res, next) => {
 
     const asset = await Asset.create({
       department,
-      category: (category || '').toString().toLowerCase(),
+      category: (category || type || 'capital').toString().toLowerCase(),
       itemName,
       quantity: quantityNum,
       pricePerItem: priceNum,
@@ -250,9 +271,9 @@ export const updateAsset = async (req, res, next) => {
   try {
     const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
 
-    const quantityNum = parseInt(quantity);
-    const priceNum = parseFloat(pricePerItem);
-    const totalAmount = quantityNum * priceNum;
+    const quantityNum = quantity !== undefined ? parseFloat(quantity) : undefined;
+    const priceNum = pricePerItem !== undefined ? parseFloat(pricePerItem) : undefined;
+    const totalAmount = quantityNum != null && priceNum != null ? quantityNum * priceNum : 0;
 
     const updateData = {
       department,

@@ -21,11 +21,8 @@ export function UploadField({
   required,
   accept = {
     'application/pdf': ['.pdf'],
-    'image/*': ['.png', '.jpg', '.jpeg'],
-    'application/msword': ['.doc'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   },
-  maxSize = 5 * 1024 * 1024, // 5MB
+  maxSize = 10 * 1024 * 1024, // 10MB
 }: UploadFieldProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -102,7 +99,7 @@ export function UploadField({
                 : "Drag 'n' drop a file here, or click to select"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              PDF, DOC, DOCX, PNG, JPG (max 5MB)
+              PDF only (max 10MB)
             </p>
           </div>
         )}

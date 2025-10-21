@@ -122,23 +122,16 @@ export default function Register() {
         submitData.department = data.department;
       }
 
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submitData)
-      });
+      const response = await api.post('/api/auth/register', submitData);
 
-      const result = await response.json();
-      console.log('Registration response:', { status: response.status, data: result });
+      console.log('Registration response:', { status: response.status, data: response.data });
 
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Registration failed');
       }
 
       // Auto-login after successful registration
-      const { token, ...userData } = result.data;
+      const { token, ...userData } = response.data.data;
       login(userData, token);
 
       toast({

@@ -15,7 +15,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 
 // Load environment variables
-dotenv.config({ path: '../config.env' });
+dotenv.config({ path: './config.env' });
 
 // Connect to database
 connectDB().then(() => {

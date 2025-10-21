@@ -81,7 +81,25 @@ export const validateFileUpload = (req, res, next) => {
     if (req.file.size > maxSize) {
       return res.status(400).json({
         success: false,
-        error: 'File size too large'
+        error: `File size too large. Maximum allowed size is ${maxSize / (1024 * 1024)}MB`
+      });
+    }
+
+    // Additional security checks
+    if (req.file.originalname.includes('..') || req.file.originalname.includes('/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid filename'
+      });
+    }
+
+    // Validate file extension
+    const allowedExtensions = ['.pdf'];
+    const fileExtension = req.file.originalname.toLowerCase().substring(req.file.originalname.lastIndexOf('.'));
+    if (!allowedExtensions.includes(fileExtension)) {
+      return res.status(400).json({
+        success: false,
+        error: 'File must have .pdf extension'
       });
     }
   }

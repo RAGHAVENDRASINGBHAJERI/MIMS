@@ -28,7 +28,8 @@ const assetSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['capital', 'revenue'],
-    default: 'capital'
+    default: 'capital',
+    required: [true, 'Type is required']
   },
   // Legacy single-item fields (kept for backward compatibility)
   itemName: {
@@ -99,6 +100,11 @@ const assetSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  igst: {
+    type: Number,
+    default: 0,
+    min: [0, 'IGST cannot be negative']
+  },
   cgst: {
     type: Number,
     default: 0,
@@ -131,11 +137,19 @@ assetSchema.pre('save', function(next) {
     this.vendorName = this.vendor;
   }
 
+  // Ensure category and type are consistent
+  if (!this.category && this.type) {
+    this.category = this.type;
+  }
+  if (!this.type && this.category) {
+    this.type = this.category;
+  }
+
   if (Array.isArray(this.items) && this.items.length > 0) {
     // Ensure each item has derived totals
     this.items = this.items.map((item) => {
       const amount = (Number(item.quantity) || 0) * (Number(item.rate) || 0);
-      const tax = amount * ((Number(item.cgst) || 0) + (Number(item.sgst) || 0)) / 100;
+      const tax = amount * ((Number(item.cgst) || 0) + (Number(item.sgst) || 0) + (Number(item.igst) || 0)) / 100;
       return {
         ...item.toObject ? item.toObject() : item,
         amount,
@@ -148,6 +162,11 @@ assetSchema.pre('save', function(next) {
     }
   } else if (this.quantity != null && this.pricePerItem != null) {
     this.totalAmount = (Number(this.quantity) || 0) * (Number(this.pricePerItem) || 0);
+    // Calculate tax for single item
+    const tax = this.totalAmount * ((Number(this.cgst) || 0) + (Number(this.sgst) || 0) + (Number(this.igst) || 0)) / 100;
+    if (!this.grandTotal) {
+      this.grandTotal = this.totalAmount + tax;
+    }
   }
   next();
 });

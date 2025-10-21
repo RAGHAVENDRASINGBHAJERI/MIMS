@@ -69,15 +69,3 @@ export const departmentService = {
     return result.data;
   },
 };
-
-import api from './api';
-
-export const getAllDepartments = async () => {
-  try {
-    const res = await api.get('/departments');
-    return res.data;
-  } catch (err: any) {
-    console.error('Department fetch failed:', err.response?.data ?? err.message);
-    throw err.response?.data ?? err;
-  }
-};

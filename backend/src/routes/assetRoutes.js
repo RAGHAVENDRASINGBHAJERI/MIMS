@@ -6,7 +6,30 @@ import { validateFileUpload } from '../middleware/security.js';
 const router = express.Router();
 
 // POST /api/assets - Create asset with file upload
-router.post('/', protect, authorize('admin', 'department-officer'), uploadMiddleware, validateFileUpload, createAsset);
+router.post('/', protect, authorize('admin', 'department-officer'), (req, res, next) => {
+  uploadMiddleware(req, res, (err) => {
+    if (err) {
+      // Handle multer errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'File size too large. Maximum allowed size is 10MB'
+        });
+      }
+      if (err.message === 'Only PDF files are allowed') {
+        return res.status(400).json({
+          success: false,
+          error: 'Only PDF files are allowed for bill uploads'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: err.message || 'File upload error'
+      });
+    }
+    next();
+  });
+}, validateFileUpload, createAsset);
 
 // GET /api/assets - Get all assets
 router.get('/', protect, getAssets);
@@ -15,7 +38,30 @@ router.get('/', protect, getAssets);
 router.get('/:id', protect, getAsset);
 
 // PUT /api/assets/:id - Update asset
-router.put('/:id', protect, authorize('admin', 'department-officer'), uploadMiddleware, validateFileUpload, updateAsset);
+router.put('/:id', protect, authorize('admin', 'department-officer'), (req, res, next) => {
+  uploadMiddleware(req, res, (err) => {
+    if (err) {
+      // Handle multer errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: 'File size too large. Maximum allowed size is 10MB'
+        });
+      }
+      if (err.message === 'Only PDF files are allowed') {
+        return res.status(400).json({
+          success: false,
+          error: 'Only PDF files are allowed for bill uploads'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: err.message || 'File upload error'
+      });
+    }
+    next();
+  });
+}, validateFileUpload, updateAsset);
 
 // DELETE /api/assets/:id - Delete asset
 router.delete('/:id', protect, authorize('admin', 'department-officer'), deleteAsset);

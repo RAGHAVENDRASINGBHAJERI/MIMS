@@ -68,23 +68,16 @@ export default function Login() {
     try {
       console.log('Attempting to login with data:', { email: data.email });
       
-      // Use fetch instead of axios since fetch is working
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-      });
+      // Use the API service for consistency
+      const response = await api.post('/api/auth/login', data);
       
-      const result = await response.json();
-      console.log('Login response:', { status: response.status, data: result });
+      console.log('Login response:', { status: response.status, data: response.data });
       
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Login failed');
       }
       
-      const { token, ...userData } = result.data;
+      const { token, ...userData } = response.data.data;
       
       // Use the AuthContext login method
       login(userData, token);
