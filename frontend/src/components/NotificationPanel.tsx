@@ -35,7 +35,7 @@ const NotificationPanel: React.FC = () => {
 
   const fetchAnnouncements = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+      const API_URL = 'https://mims-1.onrender.com';
       const response = await fetch(`${API_URL}/api/announcements`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`

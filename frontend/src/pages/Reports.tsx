@@ -288,7 +288,7 @@ export default function Reports() {
 
   const downloadSingleBill = async (assetId: string, billNo: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/bill`, {
         headers: {
@@ -340,7 +340,7 @@ export default function Reports() {
 
   const handleItemUpdate = async (assetId: string, itemIndex: number, updatedItem: any, reason: string, officerName: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'PUT',
@@ -369,7 +369,7 @@ export default function Reports() {
 
   const handleItemDelete = async (assetId: string, itemIndex: number, reason: string, officerName: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'DELETE',

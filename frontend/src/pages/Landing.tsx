@@ -67,7 +67,7 @@ export default function Landing() {
     const fetchPublicData = async () => {
       try {
         // Fetch all assets for public display
-        const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+        const API_URL = 'https://mims-1.onrender.com';
         const response = await fetch(`${API_URL}/api/assets`);
         if (response.ok) {
           const result = await response.json();

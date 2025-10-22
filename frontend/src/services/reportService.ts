@@ -23,7 +23,7 @@ export interface ReportData {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+const API_BASE_URL = 'https://mims-1.onrender.com';
 
 export const reportService = {
   // Get department report

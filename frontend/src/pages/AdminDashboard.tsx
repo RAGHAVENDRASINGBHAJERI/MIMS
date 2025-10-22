@@ -76,10 +76,10 @@ export default function AdminDashboard() {
 
   const fetchAnnouncements = async () => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     setLoadingAnnouncements(true);
     try {
-      const response = await fetch('${API_URL}/api/admin/announcements', {
+      const response = await fetch(`${API_URL}/api/admin/announcements`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
 
   const toggleAnnouncementStatus = async (announcementId: string, isActive: boolean) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
       const response = await fetch(`${API_URL}/api/admin/announcements/${announcementId}`, {
         method: 'PUT',
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
 
   const deleteAnnouncement = async (announcementId: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     if (!confirm('Are you sure you want to delete this announcement?')) return;
 
     try {
@@ -156,9 +156,9 @@ export default function AdminDashboard() {
 
   const handleCreateAnnouncement = async (data: any) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('${API_URL}/api/announcements', {
+      const response = await fetch(`${API_URL}/api/announcements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,9 +191,9 @@ export default function AdminDashboard() {
 
   const fetchDatabaseStats = async () => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('${API_URL}/api/admin/database-stats', {
+      const response = await fetch(`${API_URL}/api/admin/database-stats`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
@@ -210,9 +210,9 @@ export default function AdminDashboard() {
 
   const fetchAuditLogs = async () => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('${API_URL}/api/admin/audit-logs?limit=20', {
+      const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=20`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
@@ -246,9 +246,9 @@ export default function AdminDashboard() {
 
   const exportAuditLogs = async () => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('${API_URL}/api/admin/audit-logs?limit=1000', {
+      const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=1000`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
@@ -289,7 +289,7 @@ export default function AdminDashboard() {
 
   const approvePasswordReset = async (requestId: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     try {
       const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
         method: 'POST',
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
 
   const rejectPasswordReset = async (requestId: string) => {
     
-    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+    const API_URL = 'https://mims-1.onrender.com';
     const reason = prompt('Please provide a reason for rejection:');
     if (!reason) return;
 
