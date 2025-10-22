@@ -11,13 +11,37 @@ import { getGridFS } from '../utils/gridfs.js';
 export const getDepartmentReport = async (req, res, next) => {
   try {
     const { departmentId } = req.query;
+    const user = req.user;
 
-    const matchStage = departmentId
-      ? { $match: { department: new mongoose.Types.ObjectId(departmentId) } }
-      : { $match: {} };
+    // Role-based access control
+    let filterQuery = {};
 
-    // Instead of grouping by department, return detailed assets with populated department info
-    const assets = await Asset.find(matchStage.$match)
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all departments
+      if (departmentId) {
+        filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+      }
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see their own department
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      filterQuery.department = user.department._id;
+    } else {
+      // Regular users don't have access to reports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
+
+    // Get detailed assets with populated department info
+    const assets = await Asset.find(filterQuery)
       .populate('department', 'name')
       .lean()
       .sort({ billDate: -1 });
@@ -47,26 +71,60 @@ export const getDepartmentReport = async (req, res, next) => {
 export const getVendorReport = async (req, res, next) => {
   try {
     const { vendorName } = req.query;
+    const user = req.user;
 
-    const matchStage = vendorName
-      ? { $match: { vendorName: { $regex: new RegExp(vendorName, 'i') } } }
-      : { $match: {} };
+    // Role-based access control
+    let filterQuery = {};
 
-    const report = await Asset.aggregate([
-      matchStage,
-      {
-        $group: {
-          _id: '$vendorName',
-          totalAssets: { $sum: 1 },
-          totalAmount: { $sum: '$totalAmount' },
-          vendorDetails: { $first: { address: '$vendorAddress', contact: '$contactNumber', email: '$email' } }
-        }
-      },
-      {
-        $sort: { totalAmount: -1 }
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all vendors
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see vendors for their department
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
       }
-    ]);
+      filterQuery.department = user.department._id;
+    } else {
+      // Regular users don't have access to reports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
 
+    if (vendorName) {
+      filterQuery.vendorName = { $regex: new RegExp(vendorName, 'i') };
+    }
+
+    // Get detailed assets by vendor instead of aggregated totals
+    const assets = await Asset.find(filterQuery)
+      .populate('department', 'name')
+      .lean()
+      .sort({ billDate: -1 });
+
+    // Group by vendor for summary, but return detailed items
+    const vendorGroups = {};
+    assets.forEach(asset => {
+      const vendor = asset.vendorName || 'Unknown Vendor';
+      if (!vendorGroups[vendor]) {
+        vendorGroups[vendor] = {
+          vendorName: vendor,
+          items: [],
+          totalAmount: 0,
+          itemCount: 0
+        };
+      }
+      vendorGroups[vendor].items.push(asset);
+      vendorGroups[vendor].totalAmount += asset.totalAmount || 0;
+      vendorGroups[vendor].itemCount += 1;
+    });
+
+    const report = Object.values(vendorGroups).sort((a, b) => b.totalAmount - a.totalAmount);
     const grandTotal = report.reduce((sum, vendor) => sum + vendor.totalAmount, 0);
 
     res.json({
@@ -90,8 +148,32 @@ export const getVendorReport = async (req, res, next) => {
 export const getItemReport = async (req, res, next) => {
   try {
     const { itemName } = req.query;
+    const user = req.user;
 
-    const filterQuery = {};
+    // Role-based access control
+    let filterQuery = {};
+
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all items
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see items for their department
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      filterQuery.department = user.department._id;
+    } else {
+      // Regular users don't have access to reports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
+
     if (itemName) {
       filterQuery.itemName = { $regex: new RegExp(itemName, 'i') };
     }
@@ -125,7 +207,34 @@ export const getItemReport = async (req, res, next) => {
 
 export const getYearReport = async (req, res, next) => {
   try {
+    const user = req.user;
+
+    // Role-based access control
+    let matchStage = {};
+
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all years
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see their department's year data
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      matchStage.department = user.department._id;
+    } else {
+      // Regular users don't have access to reports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
+
     const report = await Asset.aggregate([
+      { $match: matchStage },
       {
         $addFields: {
           calendarYear: { $year: '$billDate' }
@@ -168,20 +277,46 @@ export const getYearReport = async (req, res, next) => {
 export const exportExcel = async (req, res, next) => {
   try {
     const { type } = req.query;
+    const user = req.user;
     let report = [];
     let summary = null;
     let filename = '';
 
+    // Role-based access control
+    let baseMatchStage = {};
+
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all data
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see their own department's data
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      baseMatchStage.department = user.department._id;
+    } else {
+      // Regular users don't have access to exports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
+
     switch (type) {
     case 'department': {
       const departmentId = req.query.departmentId;
-      const matchStage = departmentId
-        ? { $match: { department: new mongoose.Types.ObjectId(departmentId) } }
-        : { $match: {} };
+      const matchStage = { ...baseMatchStage };
+      if (departmentId) {
+        matchStage.department = new mongoose.Types.ObjectId(departmentId);
+      }
       report = await Asset.aggregate([
+        { $match: matchStage },
         { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
         { $unwind: '$dept' },
-        matchStage,
         { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 }, totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } }, totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } } } },
         { $sort: { totalAmount: -1 } }
       ]);
@@ -202,11 +337,12 @@ export const exportExcel = async (req, res, next) => {
     }
     case 'vendor': {
       const vendorName = req.query.vendorName;
-      const matchStage = vendorName
-        ? { $match: { vendorName: { $regex: new RegExp(vendorName, 'i') } } }
-        : { $match: {} };
+      const matchStage = { ...baseMatchStage };
+      if (vendorName) {
+        matchStage.vendorName = { $regex: new RegExp(vendorName, 'i') };
+      }
       report = await Asset.aggregate([
-        matchStage,
+        { $match: matchStage },
         { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
         { $sort: { totalAmount: -1 } }
       ]);
@@ -215,6 +351,7 @@ export const exportExcel = async (req, res, next) => {
     }
       case 'year':
         report = await Asset.aggregate([
+          { $match: baseMatchStage },
           {
             $addFields: {
               calendarYear: { $year: '$billDate' }
@@ -234,16 +371,16 @@ export const exportExcel = async (req, res, next) => {
         filename = 'year_report.xlsx';
         break;
       default:
-        const { departmentId, type, startDate, endDate } = req.query;
+        const { departmentId, type: assetType, startDate, endDate } = req.query;
 
-        const filterQuery = {};
+        const filterQuery = { ...baseMatchStage };
 
         if (departmentId) {
           filterQuery.department = new mongoose.Types.ObjectId(departmentId);
         }
 
-        if (type) {
-          filterQuery.type = type;
+        if (assetType) {
+          filterQuery.type = assetType;
         }
 
         if (startDate || endDate) {
@@ -424,20 +561,46 @@ export const exportExcel = async (req, res, next) => {
 export const exportWord = async (req, res, next) => {
   try {
     const { type } = req.query;
+    const user = req.user;
     let report = [];
     let summary = null;
     let filename = '';
 
+    // Role-based access control
+    let baseMatchStage = {};
+
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all data
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see their own department's data
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      baseMatchStage.department = user.department._id;
+    } else {
+      // Regular users don't have access to exports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
+    }
+
     switch (type) {
       case 'department': {
         const departmentId = req.query.departmentId;
-        const matchStage = departmentId
-          ? { $match: { department: new mongoose.Types.ObjectId(departmentId) } }
-          : { $match: {} };
+        const matchStage = { ...baseMatchStage };
+        if (departmentId) {
+          matchStage.department = new mongoose.Types.ObjectId(departmentId);
+        }
         report = await Asset.aggregate([
+          { $match: matchStage },
           { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
           { $unwind: '$dept' },
-          matchStage,
           { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 }, totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } }, totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } } } },
           { $sort: { totalAmount: -1 } }
         ]);
@@ -454,11 +617,12 @@ export const exportWord = async (req, res, next) => {
       }
       case 'vendor': {
         const vendorName = req.query.vendorName;
-        const matchStage = vendorName
-          ? { $match: { vendorName: { $regex: new RegExp(vendorName, 'i') } } }
-          : { $match: {} };
+        const matchStage = { ...baseMatchStage };
+        if (vendorName) {
+          matchStage.vendorName = { $regex: new RegExp(vendorName, 'i') };
+        }
         report = await Asset.aggregate([
-          matchStage,
+          { $match: matchStage },
           { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
           { $sort: { totalAmount: -1 } }
         ]);
@@ -467,6 +631,7 @@ export const exportWord = async (req, res, next) => {
       }
       case 'year':
         report = await Asset.aggregate([
+          { $match: baseMatchStage },
           {
             $addFields: {
               calendarYear: { $year: '$billDate' }
@@ -490,7 +655,7 @@ export const exportWord = async (req, res, next) => {
       default:
         const { departmentId, type: assetType, startDate, endDate } = req.query;
 
-        const filterQuery = {};
+        const filterQuery = { ...baseMatchStage };
 
         if (departmentId) {
           filterQuery.department = new mongoose.Types.ObjectId(departmentId);
@@ -636,11 +801,33 @@ export const exportWord = async (req, res, next) => {
 export const getCombinedReport = async (req, res, next) => {
   try {
     const { departmentId, type, startDate, endDate } = req.query;
+    const user = req.user;
 
-    const filterQuery = {};
+    // Role-based access control
+    let filterQuery = {};
 
-    if (departmentId) {
-      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      // Admin and CAO can see all assets
+      if (departmentId) {
+        filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+      }
+    } else if (user.role === 'department-officer') {
+      // Department officers can only see their own department's assets
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user',
+          data: null
+        });
+      }
+      filterQuery.department = user.department._id;
+    } else {
+      // Regular users don't have access to reports
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions',
+        data: null
+      });
     }
 
     if (type) {
