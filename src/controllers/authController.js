@@ -1,18 +1,18 @@
 import User from '../models/User.js';
+import PasswordReset from '../models/PasswordReset.js';
+import PasswordResetRequest from '../models/PasswordResetRequest.js';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'your-secret-key', {
-    expiresIn: '30d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 };
 
 export const register = async (req, res, next) => {
   try {
-    console.log('=== REGISTER ENDPOINT HIT ===');
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    console.log('Request origin:', req.get('origin'));
     
     const { name, email, password, role, department } = req.body;
 
@@ -76,10 +76,6 @@ export const register = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
-    console.log('=== LOGIN ENDPOINT HIT ===');
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    console.log('Request origin:', req.get('origin'));
 
     const { email, password } = req.body;
 
@@ -121,10 +117,6 @@ export const login = async (req, res, next) => {
 
 export const createAdmin = async (req, res, next) => {
   try {
-    console.log('=== CREATE ADMIN ENDPOINT HIT ===');
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    console.log('Request origin:', req.get('origin'));
 
     const { name, email, password } = req.body;
 
@@ -158,6 +150,152 @@ export const createAdmin = async (req, res, next) => {
       }
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const requestPasswordReset = async (req, res, next) => {
+  try {
+    const { email, reason } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Admin can reset immediately
+    if (user.role === 'admin') {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      await PasswordReset.create({
+        userId: user._id,
+        token: resetToken
+      });
+
+      return res.json({
+        success: true,
+        message: 'Password reset token generated',
+        token: resetToken
+      });
+    }
+
+    // Officers need admin approval
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required for password reset request'
+      });
+    }
+
+    await PasswordResetRequest.create({
+      userId: user._id,
+      reason
+    });
+
+    res.json({
+      success: true,
+      message: 'Password reset request submitted. Admin approval required.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const resetRecord = await PasswordReset.findOne({
+      token,
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!resetRecord) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired reset token'
+      });
+    }
+
+    // Update user password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await User.findByIdAndUpdate(resetRecord.userId, {
+      password: hashedPassword
+    });
+
+    // Mark token as used
+    await PasswordReset.findByIdAndUpdate(resetRecord._id, {
+      used: true
+    });
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate('department', 'name')
+      .select('-password');
+
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshToken = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findById(decoded.id).populate('department');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const newToken = generateToken(user._id);
+
+    res.json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        token: newToken
+      }
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        error: 'Token expired'
+      });
+    }
     next(error);
   }
 };

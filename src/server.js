@@ -13,15 +13,15 @@ import assetRoutes from './routes/assetRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import announcementRoutes from './routes/announcementRoutes.js';
 
 // Load environment variables
-dotenv.config({ path: '../config.env' });
+dotenv.config({ path: './config.env' });
 
 // Connect to database
 connectDB().then(() => {
   // Initialize GridFS after database connection
   initGridFS();
-  console.log('GridFS initialized');
 });
 
 const app = express();
@@ -40,13 +40,11 @@ app.use(limiter);
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://localhost:8082',
-    'http://localhost:8083',
-    'http://localhost:8084',
-    'http://localhost:8085',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://your-app.netlify.app',
+    /\.netlify\.app$/,
+    /\.vercel\.app$/,
+    /\.onrender\.com$/
   ],
   credentials: true
 }));
@@ -70,6 +68,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 
 // Error handling
@@ -83,9 +82,11 @@ app.use('*', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+export default app;

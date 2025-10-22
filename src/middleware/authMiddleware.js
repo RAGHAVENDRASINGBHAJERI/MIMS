@@ -23,7 +23,7 @@ export const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
       // Get user from token
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(decoded.id).select('-password').populate('department');
 
       if (!req.user) {
         return res.status(401).json({

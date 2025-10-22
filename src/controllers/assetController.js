@@ -1,31 +1,42 @@
 import Asset from '../models/Asset.js';
+import AuditLog from '../models/AuditLog.js';
 import mongoose from 'mongoose';
 import { uploadFile, downloadFile } from '../utils/gridfs.js';
 import multer from 'multer';
 
-// Configure multer for memory storage
+// Configure multer for memory storage with PDF-only restriction
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  fileFilter: (req, file, cb) => {
+    // Only allow PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 // 10MB default
+  }
+});
 
 export const uploadMiddleware = upload.single('billFile');
 
 export const createAsset = async (req, res, next) => {
   try {
-    console.log('=== CREATE ASSET ENDPOINT HIT ===');
-    console.log('Request body:', req.body);
-    console.log('Request type field:', req.body.type);
-    console.log('Request file:', req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : 'No file');
-    console.log('Request headers:', req.headers);
+
+    // Handle multer errors (file type, size, etc.)
+    if (req.fileError) {
+      return res.status(400).json({
+        success: false,
+        error: req.fileError.message || 'File upload error'
+      });
+    }
 
     const { department, category, itemName, quantity, pricePerItem, vendor, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark, items } = req.body;
 
     if (!req.file) {
-      console.log('ERROR: No file provided');
       return res.status(400).json({
         success: false,
         error: 'Bill file is required'
@@ -33,11 +44,7 @@ export const createAsset = async (req, res, next) => {
     }
 
     // Upload file to GridFS
-    console.log('Uploading file to GridFS...');
     const fileId = await uploadFile(req.file.originalname, req.file.buffer);
-    console.log('File uploaded with ID:', fileId);
-
-    console.log('Creating asset in database...');
     const quantityNum = quantity !== undefined ? parseFloat(quantity) : undefined;
     const priceNum = pricePerItem !== undefined ? parseFloat(pricePerItem) : undefined;
     const singleTotalAmount = quantityNum != null && priceNum != null ? quantityNum * priceNum : 0;
@@ -48,13 +55,13 @@ export const createAsset = async (req, res, next) => {
       try {
         parsedItems = Array.isArray(items) ? items : JSON.parse(items);
       } catch (e) {
-        console.warn('Failed to parse items, expected JSON array or array:', e.message);
+        // Failed to parse items, using empty array
       }
     }
 
     const asset = await Asset.create({
       department,
-      category: (category || '').toString().toLowerCase(),
+      category: (category || type || 'capital').toString().toLowerCase(),
       itemName,
       quantity: quantityNum,
       pricePerItem: priceNum,
@@ -76,18 +83,13 @@ export const createAsset = async (req, res, next) => {
       grandTotal: grandTotal ? parseFloat(grandTotal) : singleTotalAmount,
       remark
     });
-    console.log('Asset created:', asset);
 
     await asset.populate('department', 'name type');
-    console.log('Asset populated with department:', asset);
-
-    console.log('Sending success response');
     res.status(201).json({
       success: true,
       data: asset
     });
   } catch (error) {
-    console.error('Error creating asset:', error);
 
     // Handle validation errors
     if (error.name === 'ValidationError') {
@@ -248,11 +250,38 @@ export const previewBill = async (req, res, next) => {
 
 export const updateAsset = async (req, res, next) => {
   try {
-    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
+    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark, items, reason, officerName } = req.body;
 
-    const quantityNum = parseInt(quantity);
-    const priceNum = parseFloat(pricePerItem);
-    const totalAmount = quantityNum * priceNum;
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for update is required'
+      });
+    }
+
+    if (!officerName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Officer name is required'
+      });
+    }
+
+    // Get original asset for audit log
+    const originalAsset = await Asset.findById(req.params.id).lean();
+
+    const quantityNum = quantity !== undefined ? parseFloat(quantity) : undefined;
+    const priceNum = pricePerItem !== undefined ? parseFloat(pricePerItem) : undefined;
+    const totalAmount = quantityNum != null && priceNum != null ? quantityNum * priceNum : 0;
+
+    // Parse items if provided (could arrive as JSON string via multipart)
+    let parsedItems = [];
+    if (items) {
+      try {
+        parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+      } catch (e) {
+        // Failed to parse items, using empty array
+      }
+    }
 
     const updateData = {
       department,
@@ -261,6 +290,7 @@ export const updateAsset = async (req, res, next) => {
       quantity: quantityNum,
       pricePerItem: priceNum,
       totalAmount: totalAmount,
+      items: parsedItems,
       vendorName,
       vendorAddress,
       contactNumber,
@@ -293,12 +323,23 @@ export const updateAsset = async (req, res, next) => {
       });
     }
 
+    // Create audit log
+    await AuditLog.create({
+      action: 'UPDATE',
+      entityType: 'ASSET',
+      entityId: asset._id,
+      userId: req.user._id,
+      reason,
+      officerName,
+      oldData: originalAsset,
+      newData: asset.toObject()
+    });
+
     res.json({
       success: true,
       data: asset
     });
   } catch (error) {
-    console.error('Error updating asset:', error);
 
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => err.message);
@@ -322,7 +363,23 @@ export const updateAsset = async (req, res, next) => {
 
 export const deleteAsset = async (req, res, next) => {
   try {
-    const asset = await Asset.findByIdAndDelete(req.params.id);
+    const { reason, officerName } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for deletion is required'
+      });
+    }
+
+    if (!officerName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Officer name is required'
+      });
+    }
+
+    const asset = await Asset.findById(req.params.id).lean();
 
     if (!asset) {
       return res.status(404).json({
@@ -331,12 +388,174 @@ export const deleteAsset = async (req, res, next) => {
       });
     }
 
-    // Optionally, delete the associated file from GridFS
-    // await deleteFile(asset.billFileId);
+    await Asset.findByIdAndDelete(req.params.id);
+
+    // Create audit log
+    await AuditLog.create({
+      action: 'DELETE',
+      entityType: 'ASSET',
+      entityId: asset._id,
+      userId: req.user._id,
+      reason,
+      officerName,
+      oldData: asset
+    });
 
     res.json({
       success: true,
       message: 'Asset deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAssetItem = async (req, res, next) => {
+  try {
+    const { itemIndex, updatedItem, reason, officerName } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for item update is required'
+      });
+    }
+
+    if (!officerName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Officer name is required'
+      });
+    }
+
+    const asset = await Asset.findById(req.params.id);
+
+    if (!asset) {
+      return res.status(404).json({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+
+    if (!asset.items || itemIndex >= asset.items.length || itemIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid item index'
+      });
+    }
+
+    const originalItem = { ...asset.items[itemIndex].toObject() };
+    
+    // Update the specific item
+    asset.items[itemIndex] = {
+      particulars: updatedItem.particulars,
+      quantity: updatedItem.quantity,
+      rate: updatedItem.rate,
+      cgst: updatedItem.cgst,
+      sgst: updatedItem.sgst,
+      amount: updatedItem.amount,
+      grandTotal: updatedItem.grandTotal
+    };
+
+    // Mark the items array as modified for Mongoose
+    asset.markModified('items');
+
+    // Recalculate asset grand total
+    const newGrandTotal = asset.items.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
+    asset.grandTotal = newGrandTotal;
+
+    await asset.save();
+    await asset.populate('department', 'name type');
+
+    // Create audit log
+    await AuditLog.create({
+      action: 'UPDATE',
+      entityType: 'ASSET_ITEM',
+      entityId: asset._id,
+      userId: req.user._id,
+      reason,
+      officerName,
+      oldData: { itemIndex, item: originalItem },
+      newData: { itemIndex, item: updatedItem }
+    });
+
+    res.json({
+      success: true,
+      data: asset
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAssetItem = async (req, res, next) => {
+  try {
+    const { itemIndex, reason, officerName } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for item deletion is required'
+      });
+    }
+
+    if (!officerName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Officer name is required'
+      });
+    }
+
+    const asset = await Asset.findById(req.params.id);
+
+    if (!asset) {
+      return res.status(404).json({
+        success: false,
+        error: 'Asset not found'
+      });
+    }
+
+    if (!asset.items || itemIndex >= asset.items.length || itemIndex < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid item index'
+      });
+    }
+
+    if (asset.items.length === 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete the last item. Delete the entire asset instead.'
+      });
+    }
+
+    const deletedItem = { ...asset.items[itemIndex].toObject() };
+    asset.items.splice(itemIndex, 1);
+
+    // Mark the items array as modified for Mongoose
+    asset.markModified('items');
+
+    // Recalculate asset grand total
+    const newGrandTotal = asset.items.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
+    asset.grandTotal = newGrandTotal;
+
+    await asset.save();
+    await asset.populate('department', 'name type');
+
+    // Create audit log
+    await AuditLog.create({
+      action: 'DELETE',
+      entityType: 'ASSET_ITEM',
+      entityId: asset._id,
+      userId: req.user._id,
+      reason,
+      officerName,
+      oldData: { itemIndex, item: deletedItem }
+    });
+
+    res.json({
+      success: true,
+      data: asset
     });
   } catch (error) {
     next(error);
