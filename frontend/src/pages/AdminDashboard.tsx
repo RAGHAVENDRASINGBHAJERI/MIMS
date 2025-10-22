@@ -75,9 +75,11 @@ export default function AdminDashboard() {
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
 
   const fetchAnnouncements = async () => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     setLoadingAnnouncements(true);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/announcements', {
+      const response = await fetch('${API_URL}/api/admin/announcements', {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
@@ -95,8 +97,10 @@ export default function AdminDashboard() {
   };
 
   const toggleAnnouncementStatus = async (announcementId: string, isActive: boolean) => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/announcements/${announcementId}`, {
+      const response = await fetch(`${API_URL}/api/admin/announcements/${announcementId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -122,10 +126,12 @@ export default function AdminDashboard() {
   };
 
   const deleteAnnouncement = async (announcementId: string) => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     if (!confirm('Are you sure you want to delete this announcement?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/announcements/${announcementId}`, {
+      const response = await fetch(`${API_URL}/api/admin/announcements/${announcementId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
@@ -149,8 +155,10 @@ export default function AdminDashboard() {
   };
 
   const handleCreateAnnouncement = async (data: any) => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('http://localhost:5000/api/announcements', {
+      const response = await fetch('${API_URL}/api/announcements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,8 +190,10 @@ export default function AdminDashboard() {
   };
 
   const fetchDatabaseStats = async () => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('http://localhost:5000/api/admin/database-stats', {
+      const response = await fetch('${API_URL}/api/admin/database-stats', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -199,8 +209,10 @@ export default function AdminDashboard() {
   };
 
   const fetchAuditLogs = async () => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('http://localhost:5000/api/admin/audit-logs?limit=20', {
+      const response = await fetch('${API_URL}/api/admin/audit-logs?limit=20', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -233,8 +245,10 @@ export default function AdminDashboard() {
   }, [activeTab]);
 
   const exportAuditLogs = async () => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch('http://localhost:5000/api/admin/audit-logs?limit=1000', {
+      const response = await fetch('${API_URL}/api/admin/audit-logs?limit=1000', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -274,8 +288,10 @@ export default function AdminDashboard() {
   };
 
   const approvePasswordReset = async (requestId: string) => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/password-reset-requests/${requestId}/approve`, {
+      const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -304,11 +320,13 @@ export default function AdminDashboard() {
   };
 
   const rejectPasswordReset = async (requestId: string) => {
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
     const reason = prompt('Please provide a reason for rejection:');
     if (!reason) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/password-reset-requests/${requestId}/reject`, {
+      const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/reject`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
