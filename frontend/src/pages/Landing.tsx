@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,8 @@ import {
   BarChart3
 } from 'lucide-react';
 import { useAssetFlow } from '@/context/AssetFlowContext';
+import { assetService } from '@/services/assetService';
+import { departmentService } from '@/services/departmentService';
 
 const features = [
   {
@@ -58,7 +61,35 @@ const itemVariants = {
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { state } = useAssetFlow();
+  const { state, dispatch } = useAssetFlow();
+
+  useEffect(() => {
+    const fetchPublicData = async () => {
+      try {
+        // Fetch all assets for public display
+        const response = await fetch('http://localhost:5000/api/assets');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data.assets) {
+            dispatch({ type: 'SET_ASSETS', payload: result.data.assets });
+          }
+        }
+        
+        // Fetch all departments for public display
+        const deptResponse = await fetch('http://localhost:5000/api/departments');
+        if (deptResponse.ok) {
+          const deptResult = await deptResponse.json();
+          if (deptResult.success && deptResult.data) {
+            dispatch({ type: 'SET_DEPARTMENTS', payload: deptResult.data });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch public data:', error);
+      }
+    };
+
+    fetchPublicData();
+  }, [dispatch]);
 
   // Calculate total value from assets
   const totalValue = state.assets.reduce((sum, asset) => sum + (asset.totalAmount || 0), 0);
@@ -68,16 +99,25 @@ export default function Landing() {
     ? `₹${(totalValue / 1000000).toFixed(1)}M`
     : `₹${totalValue.toLocaleString()}`;
 
+  // Calculate assets added this month
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const thisMonthAssets = state.assets.filter(asset => {
+    if (!asset.billDate) return false;
+    const assetDate = new Date(asset.billDate);
+    return assetDate.getMonth() === currentMonth && assetDate.getFullYear() === currentYear;
+  }).length;
+
   const stats = [
     { label: 'Total Assets', value: state.assets.length.toString(), icon: Building2 },
     { label: 'Departments', value: state.departments.length.toString(), icon: Users },
-    { label: 'This Month', value: '89', icon: Calendar }, // This might need dynamic update if data available
+    { label: 'This Month', value: thisMonthAssets.toString(), icon: Calendar },
     { label: 'Total Value', value: formattedTotalValue, icon: BarChart3 },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-primary/5">
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
         <motion.div
           initial="hidden"
@@ -86,16 +126,16 @@ export default function Landing() {
           className="text-center mb-12"
         >
           <motion.h1
-            className="text-4xl md:text-5xl font-bold text-foreground mb-4"
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4"
             variants={itemVariants}
           >
-            Welcome to <span className="bg-gradient-primary bg-clip-text text-transparent">AssetFlow</span>
+            Welcome to <span className="bg-gradient-primary bg-clip-text text-transparent">Material Inward Management System</span>
           </motion.h1>
           <motion.p
-            className="text-xl text-muted-foreground max-w-2xl mx-auto"
+            className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4"
             variants={itemVariants}
           >
-            Comprehensive asset and revenue tracking system for educational institutions
+            Comprehensive material inward tracking system for educational institutions
           </motion.p>
         </motion.div>
 
@@ -105,19 +145,19 @@ export default function Landing() {
           animate="visible"
           variants={containerVariants}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12"
         >
           {stats.map((stat) => (
             <motion.div
               key={stat.label}
-              className="p-6 bg-gradient-card border shadow-card"
+              className="p-4 sm:p-6 bg-gradient-card border shadow-card"
               variants={itemVariants}
               whileHover={{ scale: 1.05 }}
             >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground">{stat.value}</p>
                 </div>
                 <div className="p-3 bg-primary/10 rounded-full">
                   <stat.icon className="h-6 w-6 text-primary" />
@@ -132,7 +172,7 @@ export default function Landing() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-8 sm:mb-12"
         >
           {features.map((feature, index) => (
             <motion.div
@@ -141,17 +181,17 @@ export default function Landing() {
               whileTap={{ scale: 0.98 }}
               className="group"
             >
-              <Card className="p-8 h-full bg-gradient-card border shadow-card hover:shadow-elevated transition-all duration-300">
+              <Card className="p-6 sm:p-8 h-full bg-gradient-card border shadow-card hover:shadow-elevated transition-all duration-300">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className={`p-4 rounded-full ${feature.color} group-hover:scale-110 transition-transform`}>
                     <feature.icon className="h-8 w-8" />
                   </div>
                   
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-foreground">
+                    <h3 className="text-lg sm:text-xl font-semibold text-foreground">
                       {feature.title}
                     </h3>
-                    <p className="text-muted-foreground">
+                    <p className="text-sm sm:text-base text-muted-foreground">
                       {feature.description}
                     </p>
                   </div>
@@ -175,15 +215,15 @@ export default function Landing() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-gradient-primary rounded-2xl p-8 text-center"
+          className="bg-gradient-primary rounded-2xl p-6 sm:p-8 text-center"
         >
-          <h2 className="text-2xl font-bold text-primary-foreground mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-primary-foreground mb-4">
             Ready to get started?
           </h2>
-          <p className="text-primary-foreground/80 mb-6 max-w-md mx-auto">
+          <p className="text-sm sm:text-base text-primary-foreground/80 mb-6 max-w-md mx-auto px-4">
             Begin tracking your assets and revenue efficiently with our comprehensive system
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
             <Button
               onClick={() => navigate('/login')}
               variant="secondary"

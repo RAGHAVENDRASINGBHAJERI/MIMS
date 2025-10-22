@@ -1,10 +1,8 @@
 
 import Asset from '../models/Asset.js';
-import Department from '../models/Department.js';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
-import JSZip from 'jszip';
 import archiver from 'archiver';
 import PDFDocument from 'pdfkit';
 import { getGridFS } from '../utils/gridfs.js';
@@ -47,8 +45,8 @@ export const getDepartmentReport = async (req, res, next) => {
       .lean()
       .sort({ billDate: -1 });
 
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
+    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
 
     res.json({
@@ -118,6 +116,7 @@ export const getVendorReport = async (req, res, next) => {
       const vendor = asset.vendorName || 'Unknown Vendor';
       if (!vendorGroups[vendor]) {
         vendorGroups[vendor] = {
+          _id: vendor,
           vendorName: vendor,
           items: [],
           totalAmount: 0,
@@ -127,12 +126,19 @@ export const getVendorReport = async (req, res, next) => {
         };
       }
       vendorGroups[vendor].items.push(asset);
-      vendorGroups[vendor].totalAmount += asset.totalAmount || 0;
+      vendorGroups[vendor].totalAmount += (asset.grandTotal || asset.totalAmount || 0);
       vendorGroups[vendor].itemCount += 1;
-      // Collect unique item names
-      const itemName = asset.itemName || 'N/A';
-      if (!vendorGroups[vendor].itemNames.includes(itemName)) {
-        vendorGroups[vendor].itemNames.push(itemName);
+      // Collect unique item names from items array or itemName
+      if (asset.items && asset.items.length > 0) {
+        asset.items.forEach(item => {
+          if (item.particulars && !vendorGroups[vendor].itemNames.includes(item.particulars)) {
+            vendorGroups[vendor].itemNames.push(item.particulars);
+          }
+        });
+      } else if (asset.itemName) {
+        if (!vendorGroups[vendor].itemNames.includes(asset.itemName)) {
+          vendorGroups[vendor].itemNames.push(asset.itemName);
+        }
       }
       // Collect unique department names
       const departmentName = asset.department?.name || 'N/A';
@@ -191,17 +197,49 @@ export const getItemReport = async (req, res, next) => {
       });
     }
 
+    // Search in both itemName and items.particulars
     if (itemName) {
-      filterQuery.itemName = { $regex: new RegExp(itemName, 'i') };
+      filterQuery.$or = [
+        { itemName: { $regex: new RegExp(itemName, 'i') } },
+        { 'items.particulars': { $regex: new RegExp(itemName, 'i') } }
+      ];
     }
 
-    const report = await Asset.find(filterQuery)
+    const assets = await Asset.find(filterQuery)
       .populate('department', 'name')
       .lean()
       .sort({ billDate: -1 });
 
-    const totalCapital = report.reduce((sum, item) => sum + (item.type === 'capital' ? (item.totalAmount || 0) : 0), 0);
-    const totalRevenue = report.reduce((sum, item) => sum + (item.type === 'revenue' ? (item.totalAmount || 0) : 0), 0);
+    // Flatten items to treat each as individual asset
+    const report = [];
+    assets.forEach(asset => {
+      if (asset.items && asset.items.length > 0) {
+        asset.items.forEach(item => {
+          // Filter items by name if specified
+          if (!itemName || item.particulars?.toLowerCase().includes(itemName.toLowerCase())) {
+            report.push({
+              ...asset,
+              itemName: item.particulars,
+              quantity: item.quantity,
+              pricePerItem: item.rate,
+              totalAmount: item.amount,
+              grandTotal: item.grandTotal,
+              cgst: item.cgst,
+              sgst: item.sgst,
+              _isIndividualItem: true
+            });
+          }
+        });
+      } else {
+        // Legacy single item
+        if (!itemName || asset.itemName?.toLowerCase().includes(itemName.toLowerCase())) {
+          report.push(asset);
+        }
+      }
+    });
+
+    const totalCapital = report.reduce((sum, item) => sum + (item.type === 'capital' ? (item.grandTotal || item.totalAmount || 0) : 0), 0);
+    const totalRevenue = report.reduce((sum, item) => sum + (item.type === 'revenue' ? (item.grandTotal || item.totalAmount || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
 
     res.json({
@@ -293,14 +331,14 @@ export const getYearReport = async (req, res, next) => {
 
 export const exportExcel = async (req, res, next) => {
   try {
-    const { type } = req.query;
+    const { type, departmentId, vendorName, itemName, type: assetType, startDate, endDate } = req.query;
     const user = req.user;
     let report = [];
     let summary = null;
     let filename = '';
 
     // Role-based access control
-    let baseMatchStage = {};
+    let baseFilterQuery = {};
 
     if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
       // Admin and CAO can see all data
@@ -313,7 +351,7 @@ export const exportExcel = async (req, res, next) => {
           data: null
         });
       }
-      baseMatchStage.department = user.department._id;
+      baseFilterQuery.department = user.department._id;
     } else {
       // Regular users don't have access to exports
       return res.status(403).json({
@@ -323,247 +361,249 @@ export const exportExcel = async (req, res, next) => {
       });
     }
 
-    switch (type) {
-    case 'department': {
-      const departmentId = req.query.departmentId;
-      const matchStage = { ...baseMatchStage };
-      if (departmentId) {
-        matchStage.department = new mongoose.Types.ObjectId(departmentId);
-      }
-      report = await Asset.aggregate([
-        { $match: matchStage },
-        { $lookup: { from: 'departments', localField: 'department', foreignField: '_id', as: 'dept' } },
-        { $unwind: '$dept' },
-        { $group: { _id: '$dept.name', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 }, totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } }, totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } } } },
-        { $sort: { totalAmount: -1 } }
-      ]);
-      // Rename _id to departmentName for clarity in frontend
-      report = report.map(item => ({
-        departmentName: item._id,
-        totalAmount: item.totalAmount,
-        count: item.count,
-        totalCapital: item.totalCapital,
-        totalRevenue: item.totalRevenue
-      }));
-      // Calculate summary totals
-      const totalCapital = report.reduce((sum, item) => sum + item.totalCapital, 0);
-      const totalRevenue = report.reduce((sum, item) => sum + item.totalRevenue, 0);
-      const grandTotal = totalCapital + totalRevenue;
-      filename = 'department_report.xlsx';
-      break;
+    // Apply common filters
+    const filterQuery = { ...baseFilterQuery };
+    
+    if (departmentId && departmentId !== 'all' && departmentId !== 'undefined' && mongoose.Types.ObjectId.isValid(departmentId)) {
+      filterQuery.department = new mongoose.Types.ObjectId(departmentId);
     }
-    case 'vendor': {
-      const vendorName = req.query.vendorName;
-      const matchStage = { ...baseMatchStage };
-      if (vendorName) {
-        matchStage.vendorName = { $regex: new RegExp(vendorName, 'i') };
-      }
-      report = await Asset.aggregate([
-        { $match: matchStage },
-        { $group: { _id: '$vendorName', totalAmount: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
-        { $sort: { totalAmount: -1 } }
-      ]);
-      filename = 'vendor_report.xlsx';
-      break;
+    
+    if (assetType && assetType !== 'undefined') {
+      filterQuery.type = assetType;
     }
-      case 'year':
-        report = await Asset.aggregate([
-          { $match: baseMatchStage },
-          {
-            $addFields: {
-              calendarYear: { $year: '$billDate' }
-            }
-          },
-          {
-            $group: {
-              _id: '$calendarYear',
-              totalAssets: { $sum: 1 },
-              totalAmount: { $sum: '$totalAmount' }
-            }
-          },
-          {
-            $sort: { _id: -1 }
-          }
-        ]);
-        filename = 'year_report.xlsx';
-        break;
-      default:
-        const { departmentId, type: assetType, startDate, endDate } = req.query;
-
-        const filterQuery = { ...baseMatchStage };
-
-        if (departmentId) {
-          filterQuery.department = new mongoose.Types.ObjectId(departmentId);
-        }
-
-        if (assetType) {
-          filterQuery.type = assetType;
-        }
-
-        if (startDate || endDate) {
-          filterQuery.billDate = {};
-          if (startDate) {
-            filterQuery.billDate.$gte = new Date(startDate);
-          }
-          if (endDate) {
-            filterQuery.billDate.$lte = new Date(endDate);
-          }
-        }
-
-        report = await Asset.find(filterQuery)
-          .populate('department', 'name')
-          .lean()
-          .sort({ billDate: -1 });
-
-        // Calculate summary for combined report
-        const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-        const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
-        const grandTotal = totalCapital + totalRevenue;
-        const itemCount = report.length;
-
-        summary = {
-          totalCapital,
-          totalRevenue,
-          grandTotal,
-          itemCount
-        };
-
-        filename = 'assets_report.xlsx';
+    
+    if (startDate && startDate !== 'undefined') {
+      filterQuery.billDate = filterQuery.billDate || {};
+      filterQuery.billDate.$gte = new Date(startDate);
     }
+    
+    if (endDate && endDate !== 'undefined') {
+      filterQuery.billDate = filterQuery.billDate || {};
+      filterQuery.billDate.$lte = new Date(endDate);
+    }
+
+    // Apply specific filters based on report type
+    const reportType = Array.isArray(type) ? type[0] : type || 'combined';
+    if (reportType === 'vendor' && vendorName) {
+      filterQuery.vendorName = { $regex: new RegExp(vendorName, 'i') };
+    }
+    if (reportType === 'item' && itemName) {
+      filterQuery.$or = [
+        { itemName: { $regex: new RegExp(itemName, 'i') } },
+        { 'items.particulars': { $regex: new RegExp(itemName, 'i') } }
+      ];
+    }
+
+    // Get all assets for all report types
+    report = await Asset.find(filterQuery)
+      .populate('department', 'name')
+      .lean()
+      .sort({ billDate: -1 });
+
+    // Set filename based on type
+    const typeNames = {
+      department: 'department_report.xlsx',
+      vendor: 'vendor_report.xlsx', 
+      item: 'item_report.xlsx',
+      year: 'year_report.xlsx',
+      combined: 'combined_report.xlsx'
+    };
+    filename = typeNames[type] || 'assets_report.xlsx';
+
+    // Calculate summary for all report types
+    const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const grandTotal = totalCapital + totalRevenue;
+    const itemCount = report.length;
+
+    summary = {
+      totalCapital,
+      totalRevenue,
+      grandTotal,
+      itemCount
+    };
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Report');
 
-    // Add headers
-    if (type === 'department') {
-      worksheet.columns = [
-        { header: 'Department', key: 'departmentName', width: 30 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 },
-        { header: 'Asset Count', key: 'count', width: 15 }
-      ];
-    } else if (type === 'vendor') {
-      worksheet.columns = [
-        { header: 'Vendor', key: '_id', width: 30 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 },
-        { header: 'Asset Count', key: 'count', width: 15 }
-      ];
-    } else if (type === 'year') {
-      worksheet.columns = [
-        { header: 'Year', key: '_id', width: 15 },
-        { header: 'Total Assets', key: 'totalAssets', width: 15 },
-        { header: 'Total Amount', key: 'totalAmount', width: 15 }
-      ];
-    } else {
-      worksheet.columns = [
-        { header: 'Sl No.', key: 'slNo', width: 10 },
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'College ISR No.', key: 'collegeISRNo', width: 20 },
-        { header: 'IT ISR No.', key: 'itISRNo', width: 20 },
-        { header: 'Particulars', key: 'particulars', width: 30 },
-        { header: 'Vendor', key: 'vendor', width: 25 },
-        { header: 'Bill Date', key: 'billDate', width: 15 },
-        { header: 'Bill No.', key: 'billNo', width: 20 },
-        { header: 'Quantity', key: 'quantity', width: 15 },
-        { header: 'Rate', key: 'rate', width: 15 },
-        { header: 'Amount', key: 'amount', width: 15 },
-        { header: 'CGST', key: 'cgst', width: 15 },
-        { header: 'SGST', key: 'sgst', width: 15 },
-        { header: 'Grand Total', key: 'grandTotal', width: 15 },
-        { header: 'Remark', key: 'remark', width: 25 }
-      ];
-    }
+    // Add report header information
+    const reportTypeTitle = reportType.charAt(0).toUpperCase() + reportType.slice(1) + ' Report';
+
+    // Add title row
+
+    worksheet.addRow([reportTypeTitle]);
+    worksheet.addRow([]); // Empty row
+
+    // Style the header row
+    worksheet.getRow(1).font = { bold: true, size: 10};
+   
+
+    // Add column headers
+    worksheet.columns = [
+      { header: 'Sl No.', key: 'slNo' },
+      { header: 'College ISR No.', key: 'collegeISRNo' },
+      { header: 'IT ISR No.', key: 'itISRNo' },
+      { header: 'Particulars', key: 'particulars' },
+      { header: 'Vendor', key: 'vendor' },
+      { header: 'Bill Date', key: 'billDate' },
+      { header: 'Bill No.', key: 'billNo' },
+      { header: 'Quantity', key: 'quantity' },
+      { header: 'Rate', key: 'rate' },
+      { header: 'Amount', key: 'amount' },
+      { header: 'CGST%', key: 'cgst' },
+      { header: 'SGST%', key: 'sgst' },
+      { header: 'Grand Total', key: 'grandTotal' },
+      { header: 'Remark', key: 'remark' }
+    ];
 
     // Map report data to flat objects for Excel rows
-    const rows = report.flatMap(item => {
-      if (type === 'vendor') {
-        return {
-          _id: item._id || '',
-          totalAmount: item.totalAmount || '',
-          count: item.count || ''
-        };
-      } else if (type === 'year') {
-        return {
-          _id: item._id || '',
-          totalAssets: item.totalAssets || '',
-          totalAmount: item.totalAmount || ''
-        };
-      } else if (type === 'department') {
-        return {
-          departmentName: item.departmentName || '',
-          totalAmount: item.totalAmount || '',
-          count: item.count || ''
-        };
-      }
-      // Flatten items per bill; if no items array, fallback to legacy fields
-      if (Array.isArray(item.items) && item.items.length > 0) {
-        return item.items.map((sub, idx) => ({
-          slNo: idx + 1,
-          date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
-          collegeISRNo: item.collegeISRNo || '',
-          itISRNo: item.itISRNo || '',
-          particulars: sub.particulars || '',
-          vendor: item.vendorName || item.vendor || '',
-          billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-          billNo: item.billNo || '',
-          quantity: sub.quantity || '',
-          rate: sub.rate || '',
-          amount: sub.amount || '',
-          cgst: sub.cgst || '',
-          sgst: sub.sgst || '',
-          grandTotal: sub.grandTotal || '',
-          remark: item.remark || ''
-        }));
-      }
-      return [{
-        slNo: 1,
-        date: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '',
-        collegeISRNo: item.collegeISRNo || '',
-        itISRNo: item.itISRNo || '',
-        particulars: item.itemName || '',
-        vendor: item.vendorName || item.vendor || '',
-        billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-        billNo: item.billNo || '',
-        quantity: item.quantity || '',
-        rate: item.pricePerItem || '',
-        amount: item.totalAmount || '',
-        cgst: item.cgst || '',
-        sgst: item.sgst || '',
-        grandTotal: item.grandTotal || '',
-        remark: item.remark || ''
-      }];
+    let rows = [];
+    let slNoCounter = 1;
+    
+    // For item report type, flatten individual items
+    if (reportType === 'item') {
+      report.forEach(asset => {
+        if (Array.isArray(asset.items) && asset.items.length > 0) {
+          asset.items.forEach(sub => {
+            // Filter items by name if specified
+            if (!itemName || sub.particulars?.toLowerCase().includes(itemName.toLowerCase())) {
+              rows.push({
+                slNo: slNoCounter++,
+                collegeISRNo: asset.collegeISRNo || '',
+                itISRNo: asset.itISRNo || '',
+                particulars: sub.particulars || '',
+                vendor: asset.vendorName || asset.vendor || '',
+                billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+                billNo: asset.billNo || '',
+                quantity: sub.quantity || 0,
+                rate: sub.rate || 0,
+                amount: sub.amount || 0,
+                cgst: sub.cgst || 0,
+                sgst: sub.sgst || 0,
+                grandTotal: sub.grandTotal || 0,
+                remark: asset.remark || ''
+              });
+            }
+          });
+        } else {
+          // Legacy single item
+          if (!itemName || asset.itemName?.toLowerCase().includes(itemName.toLowerCase())) {
+            rows.push({
+              slNo: slNoCounter++,
+              collegeISRNo: asset.collegeISRNo || '',
+              itISRNo: asset.itISRNo || '',
+              particulars: asset.itemName || '',
+              vendor: asset.vendorName || asset.vendor || '',
+              billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+              billNo: asset.billNo || '',
+              quantity: asset.quantity || 0,
+              rate: asset.pricePerItem || 0,
+              amount: asset.totalAmount || 0,
+              cgst: asset.cgst || 0,
+              sgst: asset.sgst || 0,
+              grandTotal: asset.grandTotal || asset.totalAmount || 0,
+              remark: asset.remark || ''
+            });
+          }
+        }
+      });
+    } else {
+      // For other report types, use existing logic
+      report.forEach(item => {
+        if (Array.isArray(item.items) && item.items.length > 0) {
+          item.items.forEach(sub => {
+            rows.push({
+              slNo: slNoCounter++,
+              collegeISRNo: item.collegeISRNo || '',
+              itISRNo: item.itISRNo || '',
+              particulars: sub.particulars || '',
+              vendor: item.vendorName || item.vendor || '',
+              billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
+              billNo: item.billNo || '',
+              quantity: sub.quantity || 0,
+              rate: sub.rate || 0,
+              amount: sub.amount || 0,
+              cgst: sub.cgst || 0,
+              sgst: sub.sgst || 0,
+              grandTotal: sub.grandTotal || 0,
+              remark: item.remark || ''
+            });
+          });
+        } else {
+          rows.push({
+            slNo: slNoCounter++,
+            collegeISRNo: item.collegeISRNo || '',
+            itISRNo: item.itISRNo || '',
+            particulars: item.itemName || '',
+            vendor: item.vendorName || item.vendor || '',
+            billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
+            billNo: item.billNo || '',
+            quantity: item.quantity || 0,
+            rate: item.pricePerItem || 0,
+            amount: item.totalAmount || 0,
+            cgst: item.cgst || 0,
+            sgst: item.sgst || 0,
+            grandTotal: item.grandTotal || item.totalAmount || 0,
+            remark: item.remark || ''
+          });
+        }
+      });
+    }
+
+    if (rows.length === 0) {
+      // Create at least one row with summary info
+      rows.push({
+        slNo: '',
+        collegeISRNo: '',
+        itISRNo: '',
+        particulars: 'No data found for the selected filters',
+        vendor: '',
+        billDate: '',
+        billNo: '',
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+        cgst: 0,
+        sgst: 0,
+        grandTotal: 0,
+        remark: 'Try adjusting your filters'
+      });
+    }
+
+    // Add data rows starting from row 6 (after headers)
+    rows.forEach(row => {
+      worksheet.addRow(row);
     });
 
-    console.log('Excel worksheet columns:', worksheet.columns.map(c => c.key));
-    console.log('First 3 rows to add:', rows.slice(0, 3));
-
-    worksheet.addRows(rows);
-
-    // Add total row for combined report at the end
-    if (summary) {
+    // Add total row at the end
+    if (rows.length > 0) {
       const totalAmount = rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-      const totalCGST = rows.reduce((sum, row) => sum + (Number(row.cgst) || 0), 0);
-      const totalSGST = rows.reduce((sum, row) => sum + (Number(row.sgst) || 0), 0);
       const totalGrandTotal = rows.reduce((sum, row) => sum + (Number(row.grandTotal) || 0), 0);
+      const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
 
       worksheet.addRow({}); // Empty row for separation
       worksheet.addRow({
         slNo: '',
-        date: '',
         collegeISRNo: '',
         itISRNo: '',
-        particulars: 'Total',
+        particulars: 'TOTAL',
         vendor: '',
         billDate: '',
         billNo: '',
-        quantity: '',
+        quantity: totalQuantity,
         rate: '',
         amount: totalAmount,
-        cgst: totalCGST,
-        sgst: totalSGST,
+        cgst: '',
+        sgst: '',
         grandTotal: totalGrandTotal,
         remark: ''
       });
     }
+
+    // Auto-fit column widths
+    worksheet.columns.forEach(column => {
+      column.width = undefined;
+    });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -863,8 +903,8 @@ export const getCombinedReport = async (req, res, next) => {
 
     const assets = await Asset.find(filterQuery).populate('department', 'name').lean();
 
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
+    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
     const itemCount = assets.length;
 
@@ -933,12 +973,10 @@ export const exportBillsZip = async (req, res, next) => {
 
     // Handle archiver events
     archive.on('error', (err) => {
-      console.error('Archive error:', err);
       if (!res.headersSent) {
         res.status(500).json({ 
           success: false, 
-          message: 'Error creating ZIP file',
-          error: err.message 
+          message: 'Error creating ZIP file'
         });
       }
     });
@@ -964,7 +1002,6 @@ export const exportBillsZip = async (req, res, next) => {
           filesAdded++;
           
         } catch (fileError) {
-          console.error(`Error processing file for asset ${asset._id}:`, fileError);
           // Continue with other files
         }
       }
@@ -973,10 +1010,7 @@ export const exportBillsZip = async (req, res, next) => {
     // Finalize the archive
     await archive.finalize();
 
-    console.log(`Successfully created ZIP with ${filesAdded} files`);
-
   } catch (error) {
-    console.error('Export bills ZIP error:', error);
     if (!res.headersSent) {
       next(error);
     }
@@ -1142,7 +1176,6 @@ export const exportMergedBillsPDF = async (req, res, next) => {
     doc.end();
 
   } catch (error) {
-    console.error('Export merged bills PDF error:', error);
     if (!res.headersSent) {
       next(error);
     }

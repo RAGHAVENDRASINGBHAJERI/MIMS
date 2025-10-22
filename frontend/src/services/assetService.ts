@@ -53,6 +53,8 @@ export interface AssetFormData {
   sgst?: number;
   grandTotal?: number;
   remark?: string;
+  reason?: string;
+  officerName?: string;
   items?: Array<{
     particulars: string;
     quantity: number;
@@ -87,7 +89,7 @@ export const assetService = {
     page?: number;
     limit?: number;
   }): Promise<AssetListResponse> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -119,7 +121,7 @@ export const assetService = {
   createAsset: async (assetData: AssetFormData): Promise<Asset> => {
     console.log('Creating asset with data:', assetData);
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -168,7 +170,7 @@ export const assetService = {
 
   // Get asset by ID
   getAssetById: async (id: string): Promise<Asset> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -187,8 +189,8 @@ export const assetService = {
   },
 
   // Update asset
-  updateAsset: async (id: string, assetData: Partial<AssetFormData>): Promise<Asset> => {
-    const token = localStorage.getItem('token');
+  updateAsset: async (id: string, assetData: Partial<AssetFormData>, reason?: string, officerName?: string): Promise<Asset> => {
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -196,12 +198,16 @@ export const assetService = {
 
     const formData = new FormData();
 
+    // Add reason and officerName if provided
+    if (reason) formData.append('reason', reason);
+    if (officerName) formData.append('officerName', officerName);
+
     Object.entries(assetData).forEach(([key, value]) => {
       if (key === 'billFile' && value instanceof File) {
         formData.append('billFile', value);
       } else if (key === 'items' && Array.isArray(value)) {
         formData.append('items', JSON.stringify(value));
-      } else if (value !== undefined && value !== null) {
+      } else if (value !== undefined && value !== null && key !== 'reason' && key !== 'officerName') {
         formData.append(key, value.toString());
       }
     });
@@ -222,8 +228,8 @@ export const assetService = {
   },
 
   // Delete asset
-  deleteAsset: async (id: string): Promise<void> => {
-    const token = localStorage.getItem('token');
+  deleteAsset: async (id: string, reason: string, officerName?: string): Promise<void> => {
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -234,6 +240,7 @@ export const assetService = {
     const response = await fetch(`${API_BASE_URL}/api/assets/${id}`, {
       method: 'DELETE',
       headers,
+      body: JSON.stringify({ reason, officerName }),
     });
 
     if (!response.ok) {
@@ -244,7 +251,7 @@ export const assetService = {
 
   // Preview bill file
   previewBill: async (id: string): Promise<Blob> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

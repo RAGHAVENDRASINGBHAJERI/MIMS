@@ -1,5 +1,32 @@
 {
-  "dependencies": {
-    "mongodb": "^6.20.0"
+  "name": "assetflow-stream",
+  "version": "1.0.0",
+  "description": "A comprehensive asset management system for tracking capital and revenue assets",
+  "main": "backend/src/server.js",
+  "scripts": {
+    "install-backend": "cd backend && npm install",
+    "install-frontend": "cd frontend && npm install",
+    "install-all": "npm run install-backend && npm run install-frontend",
+    "build-frontend": "cd frontend && npm run build",
+    "start-backend": "cd backend && npm start",
+    "dev-backend": "cd backend && npm run dev",
+    "dev-frontend": "cd frontend && npm run dev",
+    "build": "npm run build-frontend",
+    "start": "npm run start-backend",
+    "seed": "cd backend && node seedDepartments.js && node seedUsers.js"
+  },
+  "keywords": [
+    "asset-management",
+    "inventory",
+    "reporting",
+    "mongodb",
+    "react",
+    "nodejs"
+  ],
+  "author": "AssetFlow Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }

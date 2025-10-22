@@ -7,11 +7,11 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  // Show loading while checking authentication
-  if (isAuthenticated === undefined) {
+  // Show loading while checking authentication state
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader size="lg" text="Checking authentication..." />
@@ -21,13 +21,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    // Prevent infinite redirect loop by checking current location
-    if (location.pathname !== '/login') {
-      return <Navigate to="/login" state={{ from: location }} replace />;
-    } else {
-      // Already on login page, do not redirect again
-      return null;
-    }
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

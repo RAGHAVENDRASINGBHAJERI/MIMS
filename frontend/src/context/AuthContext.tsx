@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 interface User {
   _id: string;
   name: string;
+  email: string;
   role: 'admin' | 'chief-administrative-officer' | 'department-officer' | 'user';
   department?: {
     _id: string;
@@ -20,6 +21,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isDepartmentOfficer: boolean;
   isChiefAdministrativeOfficer: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,30 +29,38 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for existing authentication on app load
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
+    const storedUser = sessionStorage.getItem('user');
+    const storedToken = sessionStorage.getItem('token');
     
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
+      try {
+        setUser(JSON.parse(storedUser));
+        setToken(storedToken);
+      } catch (error) {
+        // Clear invalid stored data
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+      }
     }
+    setIsLoading(false);
   }, []);
 
   const login = (userData: User, authToken: string) => {
     setUser(userData);
     setToken(authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', authToken);
+    sessionStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem('token', authToken);
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
   };
 
   const isAuthenticated = !!user && !!token;
@@ -67,7 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       isAdmin,
       isDepartmentOfficer,
-      isChiefAdministrativeOfficer
+      isChiefAdministrativeOfficer,
+      isLoading
     }}>
       {children}
     </AuthContext.Provider>

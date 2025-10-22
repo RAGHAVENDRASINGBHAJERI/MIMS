@@ -9,7 +9,8 @@ import { FormInput } from '@/components/ui/form-input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, LogIn, UserPlus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { PasswordResetDialog } from '@/components/PasswordResetDialog';
 import api from '@/services/api';
 
 const containerVariants = {
@@ -44,16 +45,19 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to intended page or dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location.state]);
 
   const {
     register,
@@ -109,7 +113,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 sm:p-6">
       <motion.div
         initial="hidden"
         animate="visible"
@@ -121,32 +125,32 @@ export default function Login() {
           whileHover={{ scale: 1.02 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="p-8 bg-white/90 backdrop-blur-sm shadow-xl border-0">
+          <Card className="p-6 sm:p-8 bg-white/90 backdrop-blur-sm shadow-xl border-0 w-full max-w-md">
             <motion.div
               className="text-center mb-8"
               variants={logoVariants}
             >
               <motion.h1
-                className="text-3xl font-bold text-gray-900 mb-2"
+                className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
-                AssetFlow
+                Material Inward Management
               </motion.h1>
               <motion.p
-                className="text-gray-600"
+                className="text-sm sm:text-base text-gray-600"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
               >
-                College Asset & Revenue Tracking
+                Material Inward Management System
               </motion.p>
             </motion.div>
 
             <motion.form
               onSubmit={handleSubmit(onSubmit)}
-              className="space-y-6"
+              className="space-y-4 sm:space-y-6"
               variants={containerVariants}
             >
               <motion.div variants={itemVariants}>
@@ -208,18 +212,24 @@ export default function Login() {
             </motion.form>
 
             <motion.div
-              className="mt-6 text-center"
+              className="mt-6 text-center space-y-2"
               variants={itemVariants}
             >
               <p className="text-gray-600">
                 Don't have an account?{' '}
+                <span className="text-blue-600 font-medium">
+                  Contact your admin to create an account
+                </span>
+              </p>
+              <p className="text-gray-600">
+                Forgot your password?{' '}
                 <motion.button
-                  onClick={() => navigate('/register')}
+                  onClick={() => setShowPasswordReset(true)}
                   className="text-blue-600 hover:text-blue-800 font-medium"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  Register here
+                  Reset password
                 </motion.button>
               </p>
             </motion.div>
@@ -240,6 +250,11 @@ export default function Login() {
             </motion.div>
           </Card>
         </motion.div>
+        
+        <PasswordResetDialog
+          open={showPasswordReset}
+          onOpenChange={setShowPasswordReset}
+        />
       </motion.div>
     </div>
   );

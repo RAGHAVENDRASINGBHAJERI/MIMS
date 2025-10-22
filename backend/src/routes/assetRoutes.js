@@ -1,5 +1,5 @@
 import express from 'express';
-import { createAsset, getAssets, getAsset, downloadBill, updateAsset, deleteAsset, uploadMiddleware, previewBill } from '../controllers/assetController.js';
+import { createAsset, getAssets, getAsset, downloadBill, updateAsset, deleteAsset, updateAssetItem, deleteAssetItem, uploadMiddleware, previewBill } from '../controllers/assetController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { validateFileUpload } from '../middleware/security.js';
 
@@ -71,5 +71,11 @@ router.get('/:id/bill', protect, downloadBill);
 
 // GET /api/assets/:id/preview - Preview bill file
 router.get('/:id/preview', protect, previewBill);
+
+// PUT /api/assets/:id/items - Update specific item
+router.put('/:id/items', protect, authorize('admin', 'department-officer'), updateAssetItem);
+
+// DELETE /api/assets/:id/items - Delete specific item
+router.delete('/:id/items', protect, authorize('admin', 'department-officer'), deleteAssetItem);
 
 export default router;

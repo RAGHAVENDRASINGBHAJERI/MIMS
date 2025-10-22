@@ -7,11 +7,11 @@ interface AdminProtectedRouteProps {
 }
 
 export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
 
   // Show loading while checking authentication
-  if (isAuthenticated === undefined) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader size="lg" text="Checking authentication..." />
@@ -21,11 +21,7 @@ export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    if (location.pathname !== '/login') {
-      return <Navigate to="/login" state={{ from: location }} replace />;
-    } else {
-      return null;
-    }
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Check if user is admin

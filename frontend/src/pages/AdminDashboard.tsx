@@ -1,794 +1,546 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Database, Users, Building2, Package } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '@/context/NotificationContext';
+import UserManagement from '@/components/UserManagement';
+import NotificationPanel from '@/components/NotificationPanel';
+import { AnnouncementDialog } from '@/components/AnnouncementDialog';
 import {
-  User,
-  Department,
-  Asset,
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-  getAllDepartments,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment,
-  getAllAssets,
-  createAsset,
-  updateAsset,
-  deleteAsset,
-  seedData
-} from '@/services/adminService';
-import { useForm } from 'react-hook-form';
+  ArrowLeft,
+  Database,
+  Users,
+  FileText,
+  Activity,
+  Eye,
+  Download,
+  Bell,
+  Plus
+} from 'lucide-react';
 
-const AdminDashboard = () => {
-  const { user } = useAuth();
+interface AuditLog {
+  _id: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  entityType: 'ASSET' | 'USER' | 'DEPARTMENT';
+  entityId: string;
+  userId: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  reason: string;
+  timestamp: string;
+}
+
+interface DatabaseStats {
+  stats: {
+    assets: number;
+    users: number;
+    departments: number;
+    auditLogs: number;
+    passwordResets: number;
+    passwordResetRequests: number;
+  };
+  assetsByType: Array<{ _id: string; count: number }>;
+  recentActivity: AuditLog[];
+  pendingPasswordResets: Array<{
+    _id: string;
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+      role: string;
+    };
+    reason: string;
+    createdAt: string;
+  }>;
+}
+
+export default function AdminDashboard() {
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('users');
-
-  // Data states
-  const [users, setUsers] = useState<User[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetsLoading, setAssetsLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  // Dialog states
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [departmentDialogOpen, setDepartmentDialogOpen] = useState(false);
-  const [assetDialogOpen, setAssetDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-
-  // Forms
-  const userForm = useForm({
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      role: '',
-      department: '',
-    },
-  });
-  const departmentForm = useForm({
-    defaultValues: {
-      name: '',
-      type: '',
-    },
-  });
-  const assetForm = useForm({
-    defaultValues: {
-      // Add appropriate default values for asset form fields
-      itemName: '',
-      department: '',
-      category: '',
-      quantity: '',
-      unitPrice: '',
-      totalAmount: '',
-      description: '',
-      vendor: '',
-      purchaseDate: '',
-      warrantyExpiry: '',
-      location: '',
-      condition: '',
-      // Add file fields if needed
-    },
-  });
-
-  // Load data
-  const loadUsers = async () => {
-    try {
-      const data = await getAllUsers();
-      setUsers(data);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load users',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const loadDepartments = async () => {
-    try {
-      const data = await getAllDepartments();
-      setDepartments(data);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load departments',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const loadAssets = async () => {
-    try {
-      const data = await getAllAssets();
-      setAssets(data);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load assets',
-        variant: 'destructive',
-      });
-    }
-  };
+  const { user, isAdmin } = useAuth();
+  const [stats, setStats] = useState<DatabaseStats | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'notifications' | 'announcements'>('overview');
+  const { addNotification } = useNotifications();
+  const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
 
   useEffect(() => {
-    if (activeTab === 'users') {
-      loadUsers();
-      loadDepartments(); // Load departments for user form dropdown
-    } else if (activeTab === 'departments') loadDepartments();
-    else if (activeTab === 'assets') loadAssets();
-  }, [activeTab]);
+    if (!isAdmin) {
+      navigate('/dashboard');
+      return;
+    }
+    fetchDatabaseStats();
+    fetchAuditLogs();
+  }, [isAdmin, navigate]);
 
-  // User handlers
-  const handleCreateUser = async (data: any) => {
+  const fetchDatabaseStats = async () => {
     try {
-      await createUser(data);
-      toast({
-        title: 'Success',
-        description: 'User created successfully',
+      const response = await fetch('http://localhost:5000/api/admin/database-stats', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-      setUserDialogOpen(false);
-      userForm.reset();
-      loadUsers();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to create user',
-        variant: 'destructive',
-      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setStats(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch database stats:', error);
     }
   };
 
-  const handleUpdateUser = async (data: any) => {
+  const fetchAuditLogs = async () => {
     try {
-      await updateUser(editingItem._id, data);
-      toast({
-        title: 'Success',
-        description: 'User updated successfully',
+      const response = await fetch('http://localhost:5000/api/admin/audit-logs?limit=20', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-      setUserDialogOpen(false);
-      setEditingItem(null);
-      userForm.reset();
-      loadUsers();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to update user',
-        variant: 'destructive',
-      });
-    }
-  };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    try {
-      await deleteUser(id);
-      toast({
-        title: 'Success',
-        description: 'User deleted successfully',
-      });
-      loadUsers();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to delete user',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Department handlers
-  const handleCreateDepartment = async (data: any) => {
-    try {
-      await createDepartment(data);
-      toast({
-        title: 'Success',
-        description: 'Department created successfully',
-      });
-      setDepartmentDialogOpen(false);
-      departmentForm.reset();
-      loadDepartments();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to create department',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleUpdateDepartment = async (data: any) => {
-    try {
-      await updateDepartment(editingItem._id, data);
-      toast({
-        title: 'Success',
-        description: 'Department updated successfully',
-      });
-      setDepartmentDialogOpen(false);
-      setEditingItem(null);
-      departmentForm.reset();
-      loadDepartments();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to update department',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteDepartment = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this department?')) return;
-    try {
-      await deleteDepartment(id);
-      toast({
-        title: 'Success',
-        description: 'Department deleted successfully',
-      });
-      loadDepartments();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to delete department',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Asset handlers
-  const handleCreateAsset = async (data: any) => {
-    try {
-      const formData = new FormData();
-      Object.keys(data).forEach(key => {
-        if (data[key]) formData.append(key, data[key]);
-      });
-      await createAsset(formData);
-      toast({
-        title: 'Success',
-        description: 'Asset created successfully',
-      });
-      setAssetDialogOpen(false);
-      assetForm.reset();
-      loadAssets();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to create asset',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleUpdateAsset = async (data: any) => {
-    try {
-      const formData = new FormData();
-      Object.keys(data).forEach(key => {
-        if (data[key]) formData.append(key, data[key]);
-      });
-      await updateAsset(editingItem._id, formData);
-      toast({
-        title: 'Success',
-        description: 'Asset updated successfully',
-      });
-      setAssetDialogOpen(false);
-      setEditingItem(null);
-      assetForm.reset();
-      loadAssets();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to update asset',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteAsset = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this asset?')) return;
-    try {
-      await deleteAsset(id);
-      toast({
-        title: 'Success',
-        description: 'Asset deleted successfully',
-      });
-      loadAssets();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to delete asset',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Seed data
-  const handleSeedData = async () => {
-    if (!confirm('This will populate the database with sample data. Continue?')) return;
-    setLoading(true);
-    try {
-      await seedData();
-      toast({
-        title: 'Success',
-        description: 'Data seeding completed successfully',
-      });
-      // Reload all data
-      loadUsers();
-      loadDepartments();
-      loadAssets();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Data seeding failed',
-        variant: 'destructive',
-      });
+      if (response.ok) {
+        const result = await response.json();
+        setAuditLogs(result.data.logs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch audit logs:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
-        </div>
-      </div>
-    );
+  const exportAuditLogs = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/admin/audit-logs?limit=1000', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const csvContent = [
+          'Timestamp,Action,Entity Type,User,Email,Reason',
+          ...result.data.logs.map((log: AuditLog) => 
+            `${new Date(log.timestamp).toLocaleString()},${log.action},${log.entityType},${log.userId.name},${log.userId.email},"${log.reason}"`
+          )
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Success',
+          description: 'Audit logs exported successfully',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to export audit logs',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const approvePasswordReset = async (requestId: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/password-reset-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Password reset request approved',
+        });
+        addNotification({
+          type: 'success',
+          title: 'Password Reset Approved',
+          message: 'Password reset request has been approved successfully'
+        });
+        fetchDatabaseStats();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to approve password reset',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const rejectPasswordReset = async (requestId: string) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/password-reset-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Password reset request rejected',
+        });
+        addNotification({
+          type: 'warning',
+          title: 'Password Reset Rejected',
+          message: `Password reset request has been rejected. Reason: ${reason}`
+        });
+        fetchDatabaseStats();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reject password reset',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (!isAdmin) {
+    return null;
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="container mx-auto p-6 space-y-6"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage users, departments, and assets for All Departments</p>
-        </div>
-        <Button onClick={handleSeedData} disabled={loading} variant="outline">
-          <Database className="h-4 w-4 mr-2" />
-          {loading ? 'Seeding...' : 'Seed Data'}
-        </Button>
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-info/5 p-6">
+      <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/dashboard')}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Database className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+              <p className="text-muted-foreground">Full database access and audit logs</p>
+            </div>
+          </div>
+          
+          {/* Tab Navigation */}
+          <div className="flex gap-2 mb-6">
+            <Button
+              variant={activeTab === 'overview' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('overview')}
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Overview
+            </Button>
+            <Button
+              variant={activeTab === 'users' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('users')}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              User Management
+            </Button>
+            <Button
+              variant={activeTab === 'notifications' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('notifications')}
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </Button>
+            <Button
+              variant={activeTab === 'announcements' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('announcements')}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Announcements
+            </Button>
+          </div>
+        </motion.div>
+
+        {activeTab === 'overview' && (
+          <>
+            {/* Database Statistics */}
+            {stats && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6"
+              >
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Assets</p>
+                  <p className="text-2xl font-bold text-primary">{stats.stats.assets}</p>
+                </div>
+                <FileText className="h-8 w-8 text-primary/70" />
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Users</p>
+                  <p className="text-2xl font-bold text-success">{stats.stats.users}</p>
+                </div>
+                <Users className="h-8 w-8 text-success/70" />
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Departments</p>
+                  <p className="text-2xl font-bold text-info">{stats.stats.departments}</p>
+                </div>
+                <Database className="h-8 w-8 text-info/70" />
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Audit Logs</p>
+                  <p className="text-2xl font-bold text-warning">{stats.stats.auditLogs}</p>
+                </div>
+                <Activity className="h-8 w-8 text-warning/70" />
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Password Resets</p>
+                  <p className="text-2xl font-bold text-purple-600">{stats.stats.passwordResets}</p>
+                </div>
+                <Eye className="h-8 w-8 text-purple-600/70" />
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Reset Requests</p>
+                  <p className="text-2xl font-bold text-orange-600">{stats.stats.passwordResetRequests}</p>
+                </div>
+                <Download className="h-8 w-8 text-orange-600/70" />
+              </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Pending Password Reset Requests */}
+        {stats && stats.pendingPasswordResets && stats.pendingPasswordResets.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-6"
+          >
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold text-foreground mb-4">Pending Password Reset Requests</h2>
+              <div className="space-y-3">
+                {stats.pendingPasswordResets.map((request) => (
+                  <div key={request._id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div>
+                      <div className="font-medium text-foreground">{request.userId.name}</div>
+                      <div className="text-sm text-muted-foreground">{request.userId.email} ({request.userId.role})</div>
+                      <div className="text-sm text-muted-foreground mt-1">Reason: {request.reason}</div>
+                      <div className="text-xs text-muted-foreground">Requested: {new Date(request.createdAt).toLocaleString()}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => approvePasswordReset(request._id)}>
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => rejectPasswordReset(request._id)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Audit Logs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Recent Audit Logs</h2>
+              <Button onClick={exportAuditLogs} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export All Logs
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-muted-foreground">Loading audit logs...</p>
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p className="mt-2 text-muted-foreground">No audit logs found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Timestamp</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Action</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Entity</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">User</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => (
+                      <tr key={log._id} className="border-b border-border/50 hover:bg-gray-50">
+                        <td className="p-2 text-sm text-foreground">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </td>
+                        <td className="p-2">
+                          <Badge
+                            variant={
+                              log.action === 'CREATE' ? 'default' :
+                              log.action === 'UPDATE' ? 'secondary' : 'destructive'
+                            }
+                          >
+                            {log.action}
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-sm text-foreground">{log.entityType}</td>
+                        <td className="p-2">
+                          <div>
+                            <div className="text-sm font-medium text-foreground">{log.userId.name}</div>
+                            <div className="text-xs text-muted-foreground">{log.userId.email}</div>
+                          </div>
+                        </td>
+                        <td className="p-2 text-sm text-foreground max-w-xs truncate" title={log.reason}>
+                          {log.reason}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            </Card>
+          </motion.div>
+          </>
+        )}
+
+        {activeTab === 'users' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <UserManagement />
+          </motion.div>
+        )}
+
+        {activeTab === 'notifications' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <NotificationPanel />
+          </motion.div>
+        )}
+
+        {activeTab === 'announcements' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground">Announcements</h2>
+                <Button onClick={() => setShowAnnouncementDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Announcement
+                </Button>
+              </div>
+              <div className="text-center py-8">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p className="mt-2 text-muted-foreground">Announcement management coming soon</p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+        <AnnouncementDialog
+          open={showAnnouncementDialog}
+          onOpenChange={setShowAnnouncementDialog}
+          onSubmit={handleCreateAnnouncement}
+        />
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="departments" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Departments
-          </TabsTrigger>
-          <TabsTrigger value="assets" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Assets
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Users Tab */}
-        <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage system users and their roles</CardDescription>
-              </div>
-              <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add User
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{editingItem ? 'Edit User' : 'Add New User'}</DialogTitle>
-                    <DialogDescription>
-                      {editingItem ? 'Update user information' : 'Create a new user account'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...userForm}>
-                    <form onSubmit={userForm.handleSubmit(editingItem ? handleUpdateUser : handleCreateUser)} className="space-y-4">
-                      <FormField
-                        control={userForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={userForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input type="email" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      {!editingItem && (
-                        <FormField
-                          control={userForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      <FormField
-                        control={userForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Role</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="user">User</SelectItem>
-                                <SelectItem value="department-officer">Department Officer</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={userForm.control}
-                        name="department"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Department (for Department Officers)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select department" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {departments.map((dept) => (
-                                  <SelectItem key={dept._id} value={dept._id}>
-                                    {dept.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setUserDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">
-                          {editingItem ? 'Update' : 'Create'}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user._id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                          user.role === 'department-officer' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {user.role}
-                        </span>
-                      </TableCell>
-                      <TableCell>{user.department?.name || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingItem(user);
-                              userForm.reset({
-                                name: user.name,
-                                email: user.email,
-                                role: user.role,
-                                department: user.department?._id,
-                              });
-                              setUserDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteUser(user._id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Departments Tab */}
-        <TabsContent value="departments" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Department Management</CardTitle>
-                <CardDescription>Manage departments and their types</CardDescription>
-              </div>
-              <Dialog open={departmentDialogOpen} onOpenChange={setDepartmentDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Department
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{editingItem ? 'Edit Department' : 'Add New Department'}</DialogTitle>
-                    <DialogDescription>
-                      {editingItem ? 'Update department information' : 'Create a new department'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...departmentForm}>
-                    <form onSubmit={departmentForm.handleSubmit(editingItem ? handleUpdateDepartment : handleCreateDepartment)} className="space-y-4">
-                      <FormField
-                        control={departmentForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={departmentForm.control}
-                        name="type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="academic">Academic</SelectItem>
-                                <SelectItem value="administrative">Administrative</SelectItem>
-                                <SelectItem value="support">Support</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setDepartmentDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">
-                          {editingItem ? 'Update' : 'Create'}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {departments.map((department) => (
-                    <TableRow key={department._id}>
-                      <TableCell>{department.name}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          department.type === 'academic' ? 'bg-green-100 text-green-800' :
-                          department.type === 'administrative' ? 'bg-blue-100 text-blue-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
-                          {department.type}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingItem(department);
-                              departmentForm.reset({
-                                name: department.name,
-                                type: department.type,
-                              });
-                              setDepartmentDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteDepartment(department._id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Assets Tab */}
-        <TabsContent value="assets" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Asset Management</CardTitle>
-                <CardDescription>Manage all assets in the system</CardDescription>
-              </div>
-              <Dialog open={assetDialogOpen} onOpenChange={setAssetDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Asset
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingItem ? 'Edit Asset' : 'Add New Asset'}</DialogTitle>
-                    <DialogDescription>
-                      {editingItem ? 'Update asset information' : 'Create a new asset'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Form {...assetForm}>
-                    <form onSubmit={assetForm.handleSubmit(editingItem ? handleUpdateAsset : handleCreateAsset)} className="space-y-4">
-                      {/* Asset form fields would go here - simplified for brevity */}
-                      <div className="text-center py-8 text-gray-500">
-                        Asset form implementation would include all the fields from the asset creation form
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setAssetDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">
-                          {editingItem ? 'Update' : 'Create'}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.isArray(assets) && assets.map((asset) => (
-                    <TableRow key={asset._id}>
-                      <TableCell>{asset.itemName}</TableCell>
-                      <TableCell>{asset.department?.name || 'N/A'}</TableCell>
-                      <TableCell>{asset.category}</TableCell>
-                      <TableCell>{asset.quantity}</TableCell>
-                      <TableCell>₹{asset.totalAmount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingItem(asset);
-                              // assetForm.reset({...asset});
-                              setAssetDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteAsset(asset._id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </motion.div>
+    </div>
   );
-};
 
-export default AdminDashboard;
+  async function handleCreateAnnouncement(data: any) {
+    try {
+      const response = await fetch('http://localhost:5000/api/announcements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Announcement created successfully',
+        });
+        addNotification({
+          type: 'success',
+          title: 'Announcement Created',
+          message: `New announcement: ${data.title}`
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create announcement',
+        variant: 'destructive',
+      });
+    }
+  }
+}

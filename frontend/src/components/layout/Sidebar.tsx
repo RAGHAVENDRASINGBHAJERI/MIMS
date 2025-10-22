@@ -84,21 +84,21 @@ export function Sidebar() {
             exit="closed"
             variants={sidebarVariants}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-70 bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 z-50 md:relative md:top-0 md:h-screen md:z-0"
+            className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 sm:w-70 bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 z-50 md:relative md:top-0 md:h-screen md:z-0"
           >
-            <div className="flex flex-col h-full p-4 space-y-2">
+            <div className="flex flex-col h-full p-3 sm:p-4 space-y-2">
               {filteredNavigationItems.map((item) => (
                 <NavLink key={item.title} to={item.href}>
                   {({ isActive: navIsActive }) => (
                     <Button
                       variant="ghost"
                       className={cn(
-                        "w-full justify-start gap-3 h-12 text-left text-white hover:bg-slate-700 transition-all duration-300",
+                        "w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 text-left text-white hover:bg-slate-700 transition-all duration-300 text-sm sm:text-base",
                         navIsActive && "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:from-emerald-600 hover:to-teal-700"
                       )}
                     >
-                      <item.icon className="h-5 w-5" />
-                      <span className="font-medium">{item.title}</span>
+                      <item.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="font-medium truncate">{item.title}</span>
                     </Button>
                   )}
                 </NavLink>
@@ -113,7 +113,7 @@ export function Sidebar() {
                       <Banknote className="h-5 w-5 text-emerald-400" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets?.assets || []).length}
+                      {(state.assets || []).length}
                     </p>
                   </div>
                   
@@ -123,7 +123,7 @@ export function Sidebar() {
                       <DollarSign className="h-5 w-5 text-white" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets?.assets || []).filter(asset => asset.type === 'capital').length}
+                      {(state.assets || []).filter(asset => asset.type === 'capital').length}
                     </p>
                   </div>
                   
@@ -133,7 +133,7 @@ export function Sidebar() {
                       <TrendingUp className="h-5 w-5 text-white" />
                     </div>
                     <p className="text-2xl font-bold text-white">
-                      {(state.assets?.assets || []).filter(asset => asset.type === 'revenue').length}
+                      {(state.assets || []).filter(asset => asset.type === 'revenue').length}
                     </p>
                   </div>
                 </div>

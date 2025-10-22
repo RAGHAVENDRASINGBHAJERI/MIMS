@@ -197,7 +197,7 @@ export const reportService = {
   },
 
   // Export report to Excel
-  exportToExcel: async (type: string = 'all', filters: Record<string, string> = {}): Promise<Blob> => {
+  exportToExcel: async (type: string = 'combined', filters: Record<string, string> = {}): Promise<Blob> => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
@@ -207,14 +207,17 @@ export const reportService = {
     const params = new URLSearchParams();
     params.append('type', type);
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
+      if (value && value !== 'undefined') {
         params.append(key, value);
       }
     });
 
+    console.log('Excel export params:', params.toString());
     const response = await fetch(`${API_BASE_URL}/api/reports/export/excel?${params.toString()}`, { headers });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Excel export error:', errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 

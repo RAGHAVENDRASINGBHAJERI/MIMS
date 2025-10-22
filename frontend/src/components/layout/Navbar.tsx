@@ -1,4 +1,4 @@
-import { Menu, Bell, User, Search, LogOut } from 'lucide-react';
+import { Menu, Bell, User, Search, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAssetFlow } from '@/context/AssetFlowContext';
@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const containerVariants = {
   hidden: { opacity: 0, y: -20 },
@@ -39,6 +39,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleToggleSidebar = () => {
     dispatch({ type: 'TOGGLE_SIDEBAR' });
@@ -61,20 +62,36 @@ export function Navbar() {
     });
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    closeMobileMenu();
+  };
+
   return (
-    <motion.nav
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="h-20 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between px-8 shadow-lg sticky top-0 z-50"
-    >
+    <>
+      <motion.nav
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="h-14 sm:h-16 lg:h-20 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-lg sticky top-0 z-50"
+      >
       <motion.div
-        className="flex items-center gap-4"
+        className="flex items-center gap-2 sm:gap-4"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
       >
+        {/* Desktop Sidebar Toggle */}
         <motion.div
+          className="hidden lg:block"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -84,24 +101,25 @@ export function Navbar() {
             onClick={handleToggleSidebar}
             className="hover:bg-blue-700 text-white transition-all duration-300"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
         </motion.div>
 
         <motion.div
-          className="flex items-center gap-3"
+          className="flex items-center gap-2 sm:gap-3 cursor-pointer"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          onClick={() => navigate('/')}
         >
           <motion.div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg overflow-hidden"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shadow-lg overflow-hidden"
             initial={{ rotate: -10, scale: 0.8 }}
             animate={{ rotate: 0, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
             whileHover={{ scale: 1.1, rotate: 5 }}
           >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="100%" height="100%" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
@@ -109,68 +127,74 @@ export function Navbar() {
                 </linearGradient>
               </defs>
               <circle cx="20" cy="20" r="20" fill="url(#gradient)" />
-              <text x="20" y="25" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="12" fontWeight="bold">MIMS</text>
+              <text x="20" y="25" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="bold">MIMS</text>
             </svg>
           </motion.div>
-          <div className="text-white">
+          <div className="text-white hidden sm:block">
             <motion.h1
-              className="text-xl font-bold"
+              className="text-sm md:text-base lg:text-lg xl:text-xl font-bold leading-tight"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              Material Inward Management System
+              <span className="hidden md:inline">Material Inward Management System</span>
+              <span className="md:hidden">MIMS</span>
             </motion.h1>
             <motion.p
-              className="text-sm text-gray-300"
+              className="text-xs lg:text-sm text-gray-300 hidden lg:block"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
             >
-              Asset & Revenue Tracking Platform
+              Capital & Revenue Tracking Platform
             </motion.p>
           </div>
         </motion.div>
       </motion.div>
 
       <motion.div
-        className="flex items-center gap-6"
+        className="flex items-center gap-2 sm:gap-4 lg:gap-6"
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
       >
         {isAuthenticated ? (
-          <motion.div className="flex items-center gap-4 text-white">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-              onClick={() => navigate('/dashboard')}
-            >
-              Dashboard
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-              onClick={() => navigate('/add-material')}
-            >
-              Add Material
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-              onClick={() => navigate('/reports')}
-            >
-              Reports
-            </motion.button>
+          <>
+            {/* Desktop Navigation */}
+            <motion.div className="hidden lg:flex items-center gap-4 text-white">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-3 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium text-sm"
+                onClick={() => navigate('/dashboard')}
+              >
+                Dashboard
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-3 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium text-sm"
+                onClick={() => navigate('/add-material')}
+              >
+                Add Material
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-3 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium text-sm"
+                onClick={() => navigate('/reports')}
+              >
+                Reports
+              </motion.button>
+            </motion.div>
+            
+            {/* User Avatar */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
+                <Button variant="ghost" className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full">
+                  <Avatar className="h-8 w-8 sm:h-9 sm:w-9">
                     <AvatarImage src="" alt={user?.name} />
-                    <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="text-xs sm:text-sm">{user?.name?.charAt(0)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -190,28 +214,81 @@ export function Navbar() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </motion.div>
+            
+            {/* Mobile Menu Button */}
+            <motion.div
+              className="lg:hidden"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMobileMenu}
+                className="hover:bg-blue-700 text-white transition-all duration-300"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </Button>
+            </motion.div>
+          </>
         ) : (
-          <motion.div className="flex items-center gap-4 text-white">
+          <motion.div className="flex items-center gap-2 sm:gap-4 text-white">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
+              className="px-3 sm:px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium text-sm sm:text-base"
               onClick={() => navigate('/login')}
             >
               Login
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium"
-              onClick={() => navigate('/register')}
-            >
-              Register
-            </motion.button>
           </motion.div>
         )}
       </motion.div>
-    </motion.nav>
+      </motion.nav>
+      
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="lg:hidden fixed top-14 sm:top-16 left-0 right-0 bg-slate-800 shadow-lg z-40 border-t border-slate-600"
+          >
+            <div className="px-4 py-3 space-y-2">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
+                onClick={() => handleNavigation('/dashboard')}
+              >
+                Dashboard
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
+                onClick={() => handleNavigation('/add-material')}
+              >
+                Add Material
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
+                onClick={() => handleNavigation('/reports')}
+              >
+                Reports
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

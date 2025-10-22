@@ -13,6 +13,7 @@ import assetRoutes from './routes/assetRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import announcementRoutes from './routes/announcementRoutes.js';
 
 // Load environment variables
 dotenv.config({ path: './config.env' });
@@ -21,7 +22,6 @@ dotenv.config({ path: './config.env' });
 connectDB().then(() => {
   // Initialize GridFS after database connection
   initGridFS();
-  console.log('GridFS initialized');
 });
 
 const app = express();
@@ -70,6 +70,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 
 // Error handling
@@ -86,6 +87,8 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+  }
 });

@@ -9,6 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ReasonDialog } from '@/components/ReasonDialog';
+import { OfficerReasonDialog } from '@/components/OfficerReasonDialog';
+import { ItemEditDialog } from '@/components/ItemEditDialog';
+import { useNotifications } from '@/context/NotificationContext';
+import NotificationPanel from '@/components/NotificationPanel';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useAssetFlow } from '@/context/AssetFlowContext';
 import { useAuth } from '@/context/AuthContext';
@@ -28,7 +33,8 @@ import {
   Edit,
   Trash2,
   Eye,
-  FileDown
+  FileDown,
+  Bell
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -54,6 +60,7 @@ export default function Reports() {
   const { toast } = useToast();
   const { state, dispatch } = useAssetFlow();
   const { user, isAdmin, isChiefAdministrativeOfficer } = useAuth();
+  const { addNotification } = useNotifications();
   const [filters, setFilters] = useState<ReportFilters>({});
   const [reportData, setReportData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +71,16 @@ export default function Reports() {
   const [editFormData, setEditFormData] = useState<Partial<AssetFormData>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
+  const [showUpdateReasonDialog, setShowUpdateReasonDialog] = useState(false);
+  const [showDeleteReasonDialog, setShowDeleteReasonDialog] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<string | null>(null);
+  const [showItemEditDialog, setShowItemEditDialog] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number>(-1);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'reports' | 'notifications'>('reports');
+  const [showOfficerUpdateDialog, setShowOfficerUpdateDialog] = useState(false);
+  const [showOfficerDeleteDialog, setShowOfficerDeleteDialog] = useState(false);
 
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -164,7 +181,14 @@ export default function Reports() {
   const exportToExcel = async () => {
     setIsExporting(true);
     try {
-      const blob = await reportService.exportToExcel(reportType, filters as Record<string, string>);
+      const exportFilters = { ...filters };
+      // Remove undefined values
+      Object.keys(exportFilters).forEach(key => {
+        if (exportFilters[key] === undefined || exportFilters[key] === '') {
+          delete exportFilters[key];
+        }
+      });
+      const blob = await reportService.exportToExcel(reportType, exportFilters as Record<string, string>);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -266,7 +290,7 @@ export default function Reports() {
     try {
       const response = await fetch(`http://localhost:5000/api/assets/${assetId}/bill`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
       
@@ -305,6 +329,67 @@ export default function Reports() {
     setExpandedAssets(newExpanded);
   };
 
+  const handleItemEdit = (item: any, itemIndex: number, assetId: string) => {
+    setSelectedItem(item);
+    setSelectedItemIndex(itemIndex);
+    setSelectedAssetId(assetId);
+    setShowItemEditDialog(true);
+  };
+
+  const handleItemUpdate = async (assetId: string, itemIndex: number, updatedItem: any, reason: string, officerName: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/assets/${assetId}/items`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ itemIndex, updatedItem, reason, officerName })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update item');
+      }
+
+      addNotification({
+        type: 'success',
+        title: 'Item Updated',
+        message: `Item updated by ${officerName}. Reason: ${reason}`
+      });
+
+      await generateReport(false);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleItemDelete = async (assetId: string, itemIndex: number, reason: string, officerName: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/assets/${assetId}/items`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ itemIndex, reason, officerName })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete item');
+      }
+
+      addNotification({
+        type: 'warning',
+        title: 'Item Deleted',
+        message: `Item deleted by ${officerName}. Reason: ${reason}`
+      });
+
+      await generateReport(false);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const renderItemsTable = (items: any[], assetId: string, billNo: string) => {
     if (!items || items.length === 0) return null;
     
@@ -322,6 +407,7 @@ export default function Reports() {
                 <th className="text-left p-2 text-xs font-medium text-gray-500">SGST%</th>
                 <th className="text-left p-2 text-xs font-medium text-gray-500">Amount</th>
                 <th className="text-left p-2 text-xs font-medium text-gray-500">Total</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -334,6 +420,28 @@ export default function Reports() {
                   <td className="p-2 text-gray-700">{item.sgst}%</td>
                   <td className="p-2 text-gray-700">₹{item.amount?.toLocaleString()}</td>
                   <td className="p-2 font-medium text-gray-900">₹{item.grandTotal?.toLocaleString()}</td>
+                  <td className="p-2">
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleItemEdit(item, index, assetId)}
+                        className="h-6 w-6 p-0"
+                        title="Edit Item"
+                      >
+                        <Edit className="h-3 w-3 text-primary" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleItemEdit(item, index, assetId)}
+                        className="h-6 w-6 p-0"
+                        title="Delete Item"
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -384,16 +492,24 @@ export default function Reports() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateAsset = async () => {
+  const handleUpdateAsset = async (reason: string, officerName: string) => {
     if (!selectedAsset) return;
 
     setIsUpdating(true);
     try {
-      await assetService.updateAsset(selectedAsset._id, editFormData);
+      const updateData = { ...editFormData };
+      await assetService.updateAsset(selectedAsset._id, updateData, reason, officerName);
+      
+      addNotification({
+        type: 'success',
+        title: 'Asset Updated',
+        message: `Asset updated by ${officerName}. Reason: ${reason}`
+      });
       setIsEditDialogOpen(false);
+      setShowUpdateReasonDialog(false);
       setSelectedAsset(null);
       setEditFormData({});
-      await generateReport(false); // Refresh the report data without toast
+      await generateReport(false);
 
       toast({
         title: 'Success',
@@ -411,14 +527,28 @@ export default function Reports() {
     }
   };
 
-  const handleDeleteAsset = async (assetId: string) => {
+  const handleUpdateClick = () => {
+    setShowOfficerUpdateDialog(true);
+  };
+
+  const handleDeleteAsset = async (reason: string, officerName: string) => {
+    if (!assetToDelete) return;
+
     try {
-      await assetService.deleteAsset(assetId);
-      await generateReport(); // Await refresh of the report data
+      await assetService.deleteAsset(assetToDelete, reason, officerName);
+      await generateReport();
+      setShowOfficerDeleteDialog(false);
+      setAssetToDelete(null);
+
+      addNotification({
+        type: 'error',
+        title: 'Asset Deleted',
+        message: `Asset deleted by ${officerName}. Reason: ${reason}`
+      });
 
       toast({
         title: 'Success',
-        description: 'Item deleted successfully',
+        description: 'Asset deleted successfully',
       });
     } catch (error) {
       console.error('Error deleting asset:', error);
@@ -430,15 +560,20 @@ export default function Reports() {
     }
   };
 
+  const handleDeleteClick = (assetId: string) => {
+    setAssetToDelete(assetId);
+    setShowOfficerDeleteDialog(true);
+  };
+
   const handleDeleteVendor = async (vendorName: string) => {
     try {
       // Get all assets to find those from this vendor
       const allAssets = await assetService.getAssets();
-      const vendorAssets = allAssets.filter(asset => asset.vendorName === vendorName);
+      const vendorAssets = allAssets.assets.filter(asset => asset.vendorName === vendorName);
 
       // Delete each asset from this vendor
       for (const asset of vendorAssets) {
-        await assetService.deleteAsset(asset._id);
+        await assetService.deleteAsset(asset._id, 'Vendor deletion', 'System');
       }
 
       await generateReport(); // Refresh the report data
@@ -461,11 +596,11 @@ export default function Reports() {
     try {
       // Get all assets to find those from this department
       const allAssets = await assetService.getAssets();
-      const departmentAssets = allAssets.filter(asset => asset.department?.name === departmentName);
+      const departmentAssets = allAssets.assets.filter(asset => asset.department?.name === departmentName);
 
       // Delete each asset from this department
       for (const asset of departmentAssets) {
-        await assetService.deleteAsset(asset._id);
+        await assetService.deleteAsset(asset._id, 'Department deletion', 'System');
       }
 
       await generateReport(); // Refresh the report data
@@ -489,7 +624,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-info/5 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-info/5 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial="hidden"
@@ -515,10 +650,30 @@ export default function Reports() {
               <FileBarChart className="h-6 w-6 text-info" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
-              <p className="text-muted-foreground">Generate comprehensive asset and revenue reports</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Reports & Analytics</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Generate comprehensive asset and revenue reports</p>
             </div>
           </motion.div>
+          
+          {/* Tab Navigation */}
+          <div className="flex flex-wrap gap-2 mt-4 sm:mt-6">
+            <Button
+              variant={activeTab === 'reports' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('reports')}
+            >
+              <FileBarChart className="h-4 w-4 mr-2" />
+              Reports
+            </Button>
+            {(isAdmin || isChiefAdministrativeOfficer) && (
+              <Button
+                variant={activeTab === 'notifications' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('notifications')}
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Notifications
+              </Button>
+            )}
+          </div>
         </motion.div>
 
         {/* Edit Asset Dialog */}
@@ -621,7 +776,7 @@ export default function Reports() {
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isUpdating}>
                 Cancel
               </Button>
-              <Button onClick={handleUpdateAsset} disabled={isUpdating}>
+              <Button onClick={handleUpdateClick} disabled={isUpdating}>
                 {isUpdating ? 'Updating...' : 'Update'}
               </Button>
             </div>
@@ -629,14 +784,16 @@ export default function Reports() {
         </DialogContent>
         </Dialog>
 
-        {/* Report Type Selector */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          transition={{ delay: 0.05 }}
-          className="mb-6"
-        >
+        {activeTab === 'reports' && (
+          <>
+            {/* Report Type Selector */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={containerVariants}
+              transition={{ delay: 0.05 }}
+              className="mb-6"
+            >
           <motion.div variants={itemVariants}>
             <Card className="p-6 bg-gradient-card shadow-card">
               <div className="space-y-2">
@@ -748,7 +905,7 @@ export default function Reports() {
                 <h2 className="text-lg font-semibold text-foreground">Report Filters</h2>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {reportType === 'item' && (
                   <div className="space-y-2">
                     <Label>Item Name</Label>
@@ -773,7 +930,7 @@ export default function Reports() {
                 )}
                 <div className="space-y-2">
                   <Label>Department</Label>
-                  <Select value={filters.departmentId || ''} onValueChange={(value) => setFilters({ ...filters, departmentId: value || undefined })}>
+                  <Select value={filters.departmentId || ''} onValueChange={(value) => setFilters({ ...filters, departmentId: value === 'all' ? undefined : value })}>
                     <SelectTrigger>
                       <SelectValue placeholder={isAdmin || isChiefAdministrativeOfficer ? "All departments" : "Your department"} />
                     </SelectTrigger>
@@ -830,7 +987,7 @@ export default function Reports() {
                 </div>
               </div>
               
-              <div className="flex gap-4 mt-6">
+              <div className="flex flex-wrap gap-2 sm:gap-4 mt-6">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button onClick={() => handleGenerateReportClick()} disabled={isLoading}>
                     {isLoading ? (
@@ -1045,9 +1202,20 @@ export default function Reports() {
               </h3>
 
               {(() => {
-                const data = reportType === 'combined' || reportType === 'department' ? 
-                  (reportData?.data?.assets || reportData?.assets || []) : 
-                  (reportData?.data?.report || reportData?.report || []);
+                const data = (() => {
+                  switch (reportType) {
+                    case 'combined':
+                      return reportData?.data?.assets?.assets || reportData?.data?.assets || reportData?.assets || [];
+                    case 'department':
+                      return reportData?.data?.assets || reportData?.assets || [];
+                    case 'vendor':
+                    case 'item':
+                    case 'year':
+                      return reportData?.data?.report || reportData?.report || [];
+                    default:
+                      return reportData?.data?.assets || reportData?.assets || [];
+                  }
+                })();
                 const hasData = data.length > 0;
 
                 if (!hasData) {
@@ -1172,50 +1340,21 @@ export default function Reports() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => handleEdit(item)}
+                                        onClick={() => handleDeleteClick(item._id)}
                                         className="h-8 w-8 p-0"
-                                        title="Edit"
+                                        title="Delete"
                                       >
-                                        <Edit className="h-3 w-3 text-primary" />
+                                        <Trash2 className="h-3 w-3 text-destructive" />
                                       </Button>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 w-8 p-0"
-                                            title="Delete"
-                                          >
-                                            <Trash2 className="h-3 w-3 text-destructive" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Are you sure you want to delete this asset? This action cannot be undone.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() => handleDeleteAsset(item._id)}
-                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                            >
-                                              Delete
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
                                     </div>
                                   </td>
                                 </>
                               ) : reportType === 'vendor' ? (
                               <>
-                                <td className="p-2 text-sm text-foreground">{item._id}</td>
+                                <td className="p-2 text-sm text-foreground">{item.vendorName || item._id}</td>
                                 <td className="p-2 text-sm text-foreground">{item.itemNames?.join(', ') || 'N/A'}</td>
-                                <td className="p-2 text-sm text-foreground">{item.departments?.join(', ') || 'N/A'}</td>
-                                <td className="p-2 text-sm text-foreground">{item.totalAssets || item.count || 1}</td>
+                                <td className="p-2 text-sm text-foreground">{item.departmentNames?.join(', ') || 'N/A'}</td>
+                                <td className="p-2 text-sm text-foreground">{item.itemCount || item.totalAssets || item.count || 1}</td>
                                 <td className="p-2 text-sm font-medium text-foreground">
                                   ₹{item.totalAmount?.toLocaleString() || '0'}
                                 </td>
@@ -1237,13 +1376,13 @@ export default function Reports() {
                                         <AlertDialogHeader>
                                           <AlertDialogTitle>Delete Vendor Data</AlertDialogTitle>
                                           <AlertDialogDescription>
-                                            Are you sure you want to delete all assets from vendor "{item._id}"? This will delete {item.totalAssets || item.count || 1} asset(s) and cannot be undone.
+                                            Are you sure you want to delete all assets from vendor "{item.vendorName || item._id}"? This will delete {item.itemCount || item.totalAssets || item.count || 1} asset(s) and cannot be undone.
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                                           <AlertDialogAction
-                                            onClick={() => handleDeleteVendor(item._id)}
+                                            onClick={() => handleDeleteVendor(item.vendorName || item._id)}
                                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                           >
                                             Delete All Assets
@@ -1295,7 +1434,7 @@ export default function Reports() {
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                         <AlertDialogAction
-                                          onClick={() => handleDeleteAsset(item._id)}
+                                          onClick={() => handleDeleteClick(item._id)}
                                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                         >
                                           Delete
@@ -1334,6 +1473,48 @@ export default function Reports() {
             </Card>
           </motion.div>
         )}
+          </>
+        )}
+
+        {activeTab === 'notifications' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <NotificationPanel />
+          </motion.div>
+        )}
+
+        {/* Reason Dialogs */}
+        <OfficerReasonDialog
+          open={showOfficerUpdateDialog}
+          onOpenChange={setShowOfficerUpdateDialog}
+          onConfirm={handleUpdateAsset}
+          title="Update Asset"
+          description="Please provide officer name and reason for updating this asset:"
+          confirmText="Update"
+          isLoading={isUpdating}
+        />
+
+        <OfficerReasonDialog
+          open={showOfficerDeleteDialog}
+          onOpenChange={setShowOfficerDeleteDialog}
+          onConfirm={handleDeleteAsset}
+          title="Delete Asset"
+          description="Please provide officer name and reason for deleting this asset:"
+          confirmText="Delete"
+        />
+
+        <ItemEditDialog
+          open={showItemEditDialog}
+          onOpenChange={setShowItemEditDialog}
+          item={selectedItem}
+          itemIndex={selectedItemIndex}
+          assetId={selectedAssetId}
+          onItemUpdate={handleItemUpdate}
+          onItemDelete={handleItemDelete}
+        />
       </div>
     </div>
   );
