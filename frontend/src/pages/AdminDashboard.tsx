@@ -195,7 +195,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch('${API_URL}/api/admin/database-stats', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch('${API_URL}/api/admin/audit-logs?limit=20', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch('${API_URL}/api/admin/audit-logs?limit=1000', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
       const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
@@ -330,7 +330,7 @@ export default function AdminDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         },
         body: JSON.stringify({ reason })
       });

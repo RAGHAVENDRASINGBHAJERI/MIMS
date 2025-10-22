@@ -91,7 +91,7 @@ export function AssetFlowProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
         // Only fetch protected data if user is authenticated
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (!token) {
           console.log('No authentication token found, skipping protected data fetch');
           dispatch({ type: 'SET_LOADING', payload: false });
