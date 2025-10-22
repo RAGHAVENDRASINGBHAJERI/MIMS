@@ -78,6 +78,9 @@ export const reportService = {
     if (filters?.vendorName) {
       params.append('vendorName', filters.vendorName);
     }
+    if (filters?.type) {
+      params.append('type', filters.type);
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/reports/vendor?${params.toString()}`, { headers });
     const result = await response.json();
@@ -256,6 +259,31 @@ export const reportService = {
     });
 
     const response = await fetch(`${API_BASE_URL}/api/reports/download/bills?${params.toString()}`, { headers });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
+  // Merge and download all filtered bills as single PDF
+  downloadMergedBills: async (filters: ReportFilters = {}): Promise<Blob> => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && key !== 'academicYear') {
+        params.append(key, value);
+      }
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/reports/download/merged-bills?${params.toString()}`, { headers });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

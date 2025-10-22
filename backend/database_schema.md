@@ -49,6 +49,17 @@
   quantity: Number (required, min: 1),
   pricePerItem: Number (required, min: 0),
   totalAmount: Number (required, calculated as quantity * pricePerItem),
+  items: Array (optional, for multi-item bills) [
+    {
+      particulars: String (required),
+      quantity: Number (required, min: 0),
+      rate: Number (required, min: 0),
+      cgst: Number (default: 0),
+      sgst: Number (default: 0),
+      amount: Number (calculated as quantity * rate),
+      grandTotal: Number (calculated as amount + (amount * (cgst + sgst) / 100))
+    }
+  ],
   vendorName: String (required),
   vendorAddress: String (required),
   contactNumber: String (required),

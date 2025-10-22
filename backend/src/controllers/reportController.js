@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import JSZip from 'jszip';
 import archiver from 'archiver';
+import PDFDocument from 'pdfkit';
 import { getGridFS } from '../utils/gridfs.js';
 
 export const getDepartmentReport = async (req, res, next) => {
@@ -70,7 +71,7 @@ export const getDepartmentReport = async (req, res, next) => {
 
 export const getVendorReport = async (req, res, next) => {
   try {
-    const { vendorName } = req.query;
+    const { vendorName, type } = req.query;
     const user = req.user;
 
     // Role-based access control
@@ -101,6 +102,10 @@ export const getVendorReport = async (req, res, next) => {
       filterQuery.vendorName = { $regex: new RegExp(vendorName, 'i') };
     }
 
+    if (type) {
+      filterQuery.type = type;
+    }
+
     // Get detailed assets by vendor instead of aggregated totals
     const assets = await Asset.find(filterQuery)
       .populate('department', 'name')
@@ -116,12 +121,24 @@ export const getVendorReport = async (req, res, next) => {
           vendorName: vendor,
           items: [],
           totalAmount: 0,
-          itemCount: 0
+          itemCount: 0,
+          itemNames: [],
+          departmentNames: []
         };
       }
       vendorGroups[vendor].items.push(asset);
       vendorGroups[vendor].totalAmount += asset.totalAmount || 0;
       vendorGroups[vendor].itemCount += 1;
+      // Collect unique item names
+      const itemName = asset.itemName || 'N/A';
+      if (!vendorGroups[vendor].itemNames.includes(itemName)) {
+        vendorGroups[vendor].itemNames.push(itemName);
+      }
+      // Collect unique department names
+      const departmentName = asset.department?.name || 'N/A';
+      if (!vendorGroups[vendor].departmentNames.includes(departmentName)) {
+        vendorGroups[vendor].departmentNames.push(departmentName);
+      }
     });
 
     const report = Object.values(vendorGroups).sort((a, b) => b.totalAmount - a.totalAmount);
@@ -960,6 +977,172 @@ export const exportBillsZip = async (req, res, next) => {
 
   } catch (error) {
     console.error('Export bills ZIP error:', error);
+    if (!res.headersSent) {
+      next(error);
+    }
+  }
+};
+
+export const exportMergedBillsPDF = async (req, res, next) => {
+  try {
+    const { departmentId, type, startDate, endDate } = req.query;
+    const user = req.user;
+
+    // Role-based access control
+    let filterQuery = {};
+
+    if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
+      if (departmentId) {
+        filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+      }
+    } else if (user.role === 'department-officer') {
+      if (!user.department) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: No department assigned to user'
+        });
+      }
+      filterQuery.department = user.department._id;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Insufficient permissions'
+      });
+    }
+
+    if (type) {
+      filterQuery.type = type;
+    }
+
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
+    }
+
+    const assets = await Asset.find(filterQuery)
+      .populate('department', 'name')
+      .lean()
+      .sort({ billDate: -1 });
+
+    if (assets.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No assets found for merging'
+      });
+    }
+
+    // Create a new PDF document
+    const doc = new PDFDocument({ margin: 50 });
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="merged_bills_${new Date().toISOString().split('T')[0]}.pdf"`);
+    
+    // Pipe the PDF to response
+    doc.pipe(res);
+
+    // Add title page
+    doc.fontSize(20).text('Asset Bills Report', { align: 'center' });
+    doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // Add summary
+    const totalAmount = assets.reduce((sum, asset) => sum + (asset.grandTotal || asset.totalAmount || 0), 0);
+    const capitalAssets = assets.filter(a => a.type === 'capital');
+    const revenueAssets = assets.filter(a => a.type === 'revenue');
+    
+    doc.fontSize(14).text('Summary:', { underline: true });
+    doc.fontSize(12)
+      .text(`Total Assets: ${assets.length}`)
+      .text(`Capital Assets: ${capitalAssets.length}`)
+      .text(`Revenue Assets: ${revenueAssets.length}`)
+      .text(`Total Amount: ₹${totalAmount.toLocaleString()}`)
+      .moveDown(2);
+
+    // Add detailed asset information
+    doc.fontSize(14).text('Asset Details:', { underline: true });
+    doc.moveDown();
+
+    assets.forEach((asset, index) => {
+      // Add page break for each asset (except first)
+      if (index > 0) {
+        doc.addPage();
+      }
+
+      doc.fontSize(12)
+        .text(`${index + 1}. Bill #${asset.billNo || 'N/A'}`, { underline: true })
+        .text(`Date: ${asset.billDate ? new Date(asset.billDate).toLocaleDateString() : 'N/A'}`)
+        .text(`Department: ${asset.department?.name || 'N/A'}`)
+        .text(`Type: ${asset.type || 'N/A'}`)
+        .text(`Vendor: ${asset.vendorName || 'N/A'}`)
+        .text(`Contact: ${asset.contactNumber || 'N/A'}`)
+        .text(`Email: ${asset.email || 'N/A'}`)
+        .moveDown();
+
+      // Add items table if available
+      if (asset.items && asset.items.length > 0) {
+        doc.text('Items:', { underline: true });
+        
+        // Table headers
+        const startX = 50;
+        let currentY = doc.y;
+        
+        doc.text('Particulars', startX, currentY, { width: 120 })
+           .text('Qty', startX + 120, currentY, { width: 40 })
+           .text('Rate', startX + 160, currentY, { width: 60 })
+           .text('CGST%', startX + 220, currentY, { width: 50 })
+           .text('SGST%', startX + 270, currentY, { width: 50 })
+           .text('Total', startX + 320, currentY, { width: 80 });
+        
+        currentY += 20;
+        
+        // Draw line under headers
+        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        currentY += 10;
+        
+        // Add items
+        asset.items.forEach(item => {
+          doc.text(item.particulars || '', startX, currentY, { width: 120 })
+             .text((item.quantity || 0).toString(), startX + 120, currentY, { width: 40 })
+             .text(`₹${(item.rate || 0).toLocaleString()}`, startX + 160, currentY, { width: 60 })
+             .text(`${item.cgst || 0}%`, startX + 220, currentY, { width: 50 })
+             .text(`${item.sgst || 0}%`, startX + 270, currentY, { width: 50 })
+             .text(`₹${(item.grandTotal || 0).toLocaleString()}`, startX + 320, currentY, { width: 80 });
+          currentY += 15;
+        });
+        
+        // Total line
+        currentY += 10;
+        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        currentY += 10;
+        
+        const assetTotal = asset.grandTotal || asset.totalAmount || 0;
+        doc.fontSize(12).text(`Asset Total: ₹${assetTotal.toLocaleString()}`, startX + 250, currentY, { width: 150 });
+      } else {
+        // Legacy single item display
+        doc.text(`Item: ${asset.itemName || 'N/A'}`)
+           .text(`Quantity: ${asset.quantity || 'N/A'}`)
+           .text(`Price per Item: ₹${(asset.pricePerItem || 0).toLocaleString()}`)
+           .text(`Total Amount: ₹${(asset.totalAmount || 0).toLocaleString()}`);
+      }
+      
+      if (asset.remark) {
+        doc.moveDown().text(`Remark: ${asset.remark}`);
+      }
+      
+      doc.moveDown(2);
+    });
+
+    // Finalize the PDF
+    doc.end();
+
+  } catch (error) {
+    console.error('Export merged bills PDF error:', error);
     if (!res.headersSent) {
       next(error);
     }

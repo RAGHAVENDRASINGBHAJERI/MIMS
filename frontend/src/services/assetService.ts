@@ -6,6 +6,15 @@ export interface Asset {
   quantity: number;
   pricePerItem: number;
   totalAmount: number;
+  items?: Array<{
+    particulars: string;
+    quantity: number;
+    rate: number;
+    cgst: number;
+    sgst: number;
+    amount: number;
+    grandTotal: number;
+  }>;
   vendorName: string;
   vendorAddress: string;
   contactNumber: string;
@@ -190,6 +199,8 @@ export const assetService = {
     Object.entries(assetData).forEach(([key, value]) => {
       if (key === 'billFile' && value instanceof File) {
         formData.append('billFile', value);
+      } else if (key === 'items' && Array.isArray(value)) {
+        formData.append('items', JSON.stringify(value));
       } else if (value !== undefined && value !== null) {
         formData.append(key, value.toString());
       }

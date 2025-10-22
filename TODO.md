@@ -1,19 +1,11 @@
-# TODO: Implement Role-Based Filtering in Reports Module
+# Multi-Item Support Implementation Plan
 
-## Backend Changes
-- [ ] Modify `getDepartmentReport` to enforce role-based access
-- [ ] Modify `getVendorReport` to show item details instead of aggregated totals, with role-based filtering
-- [ ] Modify `getItemReport` to enforce role-based access
-- [ ] Modify `getYearReport` to enforce role-based access
-- [ ] Modify `getCombinedReport` to enforce role-based access
-- [ ] Update export functions to respect role-based filtering
+## Pending Tasks
+- [x] Update Asset interface in `frontend/src/services/assetService.ts` to include `items` array
+- [x] Update `updateAsset` function in `frontend/src/services/assetService.ts` to handle items in FormData
+- [x] Update `updateAsset` controller in `backend/src/controllers/assetController.js` to handle items array updates
+- [x] Update `backend/database_schema.md` to document multi-item support in the Assets collection
 
-## Frontend Changes
-- [ ] Update Reports.tsx to handle new vendor report structure (if changed)
-- [ ] Test role-based filtering with different user types
-
-## Testing
-- [ ] Test with admin user (full access)
-- [ ] Test with CAO user (full access)
-- [ ] Test with department officer (department-restricted access)
-- [ ] Test with regular user (minimal/no access)
+## Followup Steps
+- [ ] Test the complete multi-item functionality after updates
+- [ ] Verify that both create and update operations work with multiple items

@@ -269,11 +269,21 @@ export const previewBill = async (req, res, next) => {
 
 export const updateAsset = async (req, res, next) => {
   try {
-    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark } = req.body;
+    const { department, category, itemName, quantity, pricePerItem, vendorName, vendorAddress, contactNumber, email, billNo, billDate, type, collegeISRNo, itISRNo, igst, cgst, sgst, grandTotal, remark, items } = req.body;
 
     const quantityNum = quantity !== undefined ? parseFloat(quantity) : undefined;
     const priceNum = pricePerItem !== undefined ? parseFloat(pricePerItem) : undefined;
     const totalAmount = quantityNum != null && priceNum != null ? quantityNum * priceNum : 0;
+
+    // Parse items if provided (could arrive as JSON string via multipart)
+    let parsedItems = [];
+    if (items) {
+      try {
+        parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+      } catch (e) {
+        console.warn('Failed to parse items, expected JSON array or array:', e.message);
+      }
+    }
 
     const updateData = {
       department,
@@ -282,6 +292,7 @@ export const updateAsset = async (req, res, next) => {
       quantity: quantityNum,
       pricePerItem: priceNum,
       totalAmount: totalAmount,
+      items: parsedItems,
       vendorName,
       vendorAddress,
       contactNumber,

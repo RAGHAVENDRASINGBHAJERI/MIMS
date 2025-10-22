@@ -8,6 +8,7 @@ import {
   exportExcel,
   exportWord,
   exportBillsZip,
+  exportMergedBillsPDF,
   getCombinedReport
 } from '../controllers/reportController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -37,5 +38,8 @@ router.get('/export/word', protect, exportWord);
 
 // GET /api/reports/download/bills - Download bills as ZIP
 router.get('/download/bills', protect, exportBillsZip);
+
+// GET /api/reports/download/merged-bills - Download merged bills as single PDF
+router.get('/download/merged-bills', protect, exportMergedBillsPDF);
 
 export default router;

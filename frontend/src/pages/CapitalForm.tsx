@@ -21,9 +21,9 @@ import { ArrowLeft, Save, Calculator, FileText, User, Upload } from 'lucide-reac
 import { useNavigate } from 'react-router-dom';
 
 const assetSchema = z.object({
-  itemName: z.string().min(1, 'Item name is required'),
-  quantity: z.number().min(1, 'Quantity must be at least 1'),
-  pricePerItem: z.number().min(0, 'Price must be positive'),
+  itemName: z.string().optional(),
+  quantity: z.number().optional(),
+  pricePerItem: z.number().optional(),
   vendorName: z.string().min(1, 'Vendor name is required'),
   vendorAddress: z.string().min(1, 'Vendor address is required'),
   contactNumber: z.string().min(10, 'Contact number must be at least 10 digits'),
@@ -31,12 +31,15 @@ const assetSchema = z.object({
   billNo: z.string().min(1, 'Bill number is required'),
   billDate: z.string().min(1, 'Bill date is required'),
   department: z.string().min(1, 'Department is required'),
-  category: z.string().min(1, 'Category is required'),
+  category: z.string().optional(),
   collegeISRNo: z.string().optional(),
   itISRNo: z.string().optional(),
-
-  // GST captured per item; no GST at form level
   remark: z.string().optional(),
+}).refine((data) => {
+  // Ensure at least one item has valid data
+  return true; // Items validation will be done separately
+}, {
+  message: "Form validation failed"
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -51,6 +54,7 @@ export default function CapitalForm() {
   const [items, setItems] = useState<Array<{ particulars: string; quantity: number; rate: number; cgst: number; sgst: number; amount: number; grandTotal: number }>>([
     { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }
   ]);
+  const [savedData, setSavedData] = useState<any>(null);
 
   // Auto-calculate each item totals when quantity/rate/cgst/sgst change
   useEffect(() => {
@@ -66,6 +70,23 @@ export default function CapitalForm() {
 
   const billTotalAmount = items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
   const billGrandTotal = items.reduce((sum, it) => sum + (Number(it.grandTotal) || 0), 0);
+
+  // Helper functions for item management
+  const addItem = () => {
+    setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateItem = (index: number, field: string, value: string | number) => {
+    const updated = [...items];
+    updated[index] = { ...updated[index], [field]: value };
+    setItems(updated);
+  };
 
   const {
     register,
@@ -83,6 +104,45 @@ export default function CapitalForm() {
   // GST handled at item level only
   const totalAmount = quantity * pricePerItem;
   const grandTotal = totalAmount; // item-level GST only
+
+  // Load draft data on component mount
+  useEffect(() => {
+    const draftData = localStorage.getItem('capitalFormDraft');
+    if (draftData) {
+      try {
+        const parsed = JSON.parse(draftData);
+        setSavedData(parsed);
+        // Populate form with draft data
+        Object.keys(parsed).forEach(key => {
+          if (key === 'items') {
+            setItems(parsed.items);
+          } else if (key !== 'selectedFile') {
+            setValue(key as keyof AssetFormValues, parsed[key]);
+          }
+        });
+        toast({
+          title: 'Draft Loaded',
+          description: 'Your previous draft has been loaded.',
+        });
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    }
+  }, [setValue, toast]);
+
+  // Auto-save form data to localStorage (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const formData = watch();
+      const dataToSave = {
+        ...formData,
+        items,
+      };
+      localStorage.setItem('capitalFormDraft', JSON.stringify(dataToSave));
+    }, 1000); // Save after 1 second of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [watch, items]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -117,10 +177,47 @@ export default function CapitalForm() {
   }, [dispatch, toast, user, setValue]);
 
   const onSubmit = async (data: AssetFormValues) => {
+    // Check authentication
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to submit the form',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file
     if (!selectedFile) {
       toast({
         title: 'Error',
         description: 'Please select a bill file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate department
+    if (!data.department) {
+      toast({
+        title: 'Error',
+        description: 'Please select a department',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate items array
+    const validItems = items.filter(item => 
+      item.particulars && item.particulars.trim() && 
+      item.quantity > 0 && 
+      item.rate > 0
+    );
+
+    if (validItems.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please add at least one valid item with particulars, quantity, and rate',
         variant: 'destructive',
       });
       return;
@@ -139,23 +236,27 @@ export default function CapitalForm() {
         billNo: data.billNo,
         billDate: data.billDate,
         department: data.department,
-        category: data.category,
+        category: 'capital', // Fixed to capital type for capital form
         type: 'capital',
         billFile: selectedFile,
         collegeISRNo: data.collegeISRNo,
         itISRNo: data.itISRNo,
-
-        // GST provided at item level only
         grandTotal: billGrandTotal,
         remark: data.remark,
-        items,
+        items: validItems,
       };
 
       console.log('Asset data to send:', assetData);
+      console.log('Valid items:', validItems);
+      console.log('Selected file:', selectedFile);
+      
       const newAsset = await assetService.createAsset(assetData);
       console.log('Created asset:', newAsset);
       
       dispatch({ type: 'ADD_ASSET', payload: newAsset });
+      
+      // Clear draft data on successful submission
+      localStorage.removeItem('capitalFormDraft');
       
       toast({
         title: 'Success',
@@ -165,9 +266,10 @@ export default function CapitalForm() {
       navigate('/');
     } catch (error) {
       console.error('Error creating asset:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add capital asset. Please try again.';
       toast({
         title: 'Error',
-        description: 'Failed to add capital asset. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -294,7 +396,11 @@ export default function CapitalForm() {
                   <Label htmlFor="department" className="text-sm font-medium text-gray-700">
                     Department *
                   </Label>
-                  <Select onValueChange={(value) => setValue('department', value)} disabled={user?.role === 'department-officer'}>
+                  <Select 
+                    onValueChange={(value) => setValue('department', value)} 
+                    disabled={user?.role === 'department-officer'}
+                    defaultValue={user?.role === 'department-officer' ? user.department?._id : undefined}
+                  >
                     <SelectTrigger
                       id="department"
                       aria-label="Select Department"
@@ -317,32 +423,7 @@ export default function CapitalForm() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="category" className="text-sm font-medium text-gray-700">
-                    Item Category *
-                  </Label>
-                  <Select onValueChange={(value) => setValue('category', value)}>
-                    <SelectTrigger 
-                      id="category"
-                      aria-label="Select Category"
-                      className="mt-1"
-                    >
-                      <SelectValue placeholder="Select Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {state.categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.category && (
-                    <p className="text-sm text-red-600 mt-1" role="alert">
-                      {errors.category.message}
-                    </p>
-                  )}
-                </div>
+                {/* Category is automatically set to 'capital' for capital forms */}
 
 
 
@@ -432,6 +513,13 @@ export default function CapitalForm() {
                   placeholder="Enter vendor contact number"
                   {...register('contactNumber', { required: true })}
                   error={errors.contactNumber?.message}
+                />
+                <FormInput
+                  label="Vendor Email *"
+                  type="email"
+                  placeholder="Enter vendor email"
+                  {...register('email', { required: true })}
+                  error={errors.email?.message}
                 />
                 
               </div>
@@ -573,8 +661,8 @@ export default function CapitalForm() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !isValid}
-                className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                disabled={isSubmitting || !selectedFile}
+                className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <Loader size="sm" text="Saving..." />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,9 @@ import {
   Calendar,
   Building2,
   Edit,
-  Trash2
+  Trash2,
+  Eye,
+  FileDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -61,6 +63,7 @@ export default function Reports() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<AssetFormData>>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -214,6 +217,150 @@ export default function Reports() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const downloadMergedBills = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await reportService.downloadMergedBills(filters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `merged-bills-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Merged bills downloaded successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to download merged bills',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const previewBill = async (assetId: string) => {
+    try {
+      const blob = await assetService.previewBill(assetId);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to preview bill',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const downloadSingleBill = async (assetId: string, billNo: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/assets/${assetId}/bill`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to download bill');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bill_${billNo}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Success',
+        description: 'Bill downloaded successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to download bill',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleAssetExpansion = (assetId: string) => {
+    const newExpanded = new Set(expandedAssets);
+    if (newExpanded.has(assetId)) {
+      newExpanded.delete(assetId);
+    } else {
+      newExpanded.add(assetId);
+    }
+    setExpandedAssets(newExpanded);
+  };
+
+  const renderItemsTable = (items: any[], assetId: string, billNo: string) => {
+    if (!items || items.length === 0) return null;
+    
+    return (
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Items Details</h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Particulars</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Qty</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Rate</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">CGST%</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">SGST%</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Amount</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item: any, index: number) => (
+                <tr key={index} className="border-b border-gray-100">
+                  <td className="p-2 text-gray-700">{item.particulars}</td>
+                  <td className="p-2 text-gray-700">{item.quantity}</td>
+                  <td className="p-2 text-gray-700">₹{item.rate?.toLocaleString()}</td>
+                  <td className="p-2 text-gray-700">{item.cgst}%</td>
+                  <td className="p-2 text-gray-700">{item.sgst}%</td>
+                  <td className="p-2 text-gray-700">₹{item.amount?.toLocaleString()}</td>
+                  <td className="p-2 font-medium text-gray-900">₹{item.grandTotal?.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => previewBill(assetId)}
+            className="text-xs"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Preview Bill
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadSingleBill(assetId, billNo)}
+            className="text-xs"
+          >
+            <FileDown className="h-3 w-3 mr-1" />
+            Download Bill
+          </Button>
+        </div>
+      </div>
+    );
   };
 
 
@@ -525,40 +672,59 @@ export default function Reports() {
                 <Building2 className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold text-foreground">Your Saved Assets</h2>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <motion.div
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-4 bg-primary/5 rounded-lg"
-                >
-                  <p className="text-2xl font-bold text-primary">
-                    {(reportData?.data?.assets || reportData?.assets || []).length || (state.assets || []).length || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Total Assets</p>
-                </motion.div>
-                <motion.div
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-4 bg-success/5 rounded-lg"
-                >
-                  <p className="text-2xl font-bold text-success">
-                    {((reportData?.data?.assets || reportData?.assets || []).filter((asset: any) => asset.type === 'capital').length || (state.assets || []).filter((asset: any) => asset.type === 'capital').length) || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Capital Assets</p>
-                </motion.div>
-                <motion.div
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.05 }}
-                  className="text-center p-4 bg-info/5 rounded-lg"
-                >
-                  <p className="text-2xl font-bold text-info">
-                    {((reportData?.data?.assets || reportData?.assets || []).filter((asset: any) => asset.type === 'revenue').length || (state.assets || []).filter((asset: any) => asset.type === 'revenue').length) || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Revenue Assets</p>
-                </motion.div>
-              </div>
-              
+
+              {(() => {
+                const assetsArray = (() => {
+                  switch (reportType) {
+                    case 'combined':
+                      return reportData?.data?.assets?.assets || [];
+                    case 'department':
+                      return reportData?.assets || reportData?.data?.assets || [];
+                    case 'vendor':
+                    case 'item':
+                    case 'year':
+                      return reportData?.report || [];
+                    default:
+                      return [];
+                  }
+                })();
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <motion.div
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.05 }}
+                      className="text-center p-4 bg-primary/5 rounded-lg"
+                    >
+                      <p className="text-2xl font-bold text-primary">
+                        {assetsArray.length || (state.assets || []).length || 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Total Assets</p>
+                    </motion.div>
+                    <motion.div
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.05 }}
+                      className="text-center p-4 bg-success/5 rounded-lg"
+                    >
+                      <p className="text-2xl font-bold text-success">
+                        {(assetsArray as any[]).filter((asset: any) => asset.type === 'capital').length || ((state.assets || []) as any[]).filter((asset: any) => asset.type === 'capital').length || 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Capital Assets</p>
+                    </motion.div>
+                    <motion.div
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.05 }}
+                      className="text-center p-4 bg-info/5 rounded-lg"
+                    >
+                      <p className="text-2xl font-bold text-info">
+                        {(assetsArray as any[]).filter((asset: any) => asset.type === 'revenue').length || ((state.assets || []) as any[]).filter((asset: any) => asset.type === 'revenue').length || 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Revenue Assets</p>
+                    </motion.div>
+                  </div>
+                );
+              })()}
+
               <div className="mt-4 text-center">
                 <p className="text-sm text-muted-foreground">
                   Your assets are stored in the database and can be viewed in reports below.
@@ -716,7 +882,18 @@ export default function Reports() {
                         disabled={isExporting}
                       >
                         <Download className="h-4 w-4 mr-2" />
-                        Download Bills
+                        Download Bills (ZIP)
+                      </Button>
+                    </motion.div>
+                    
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="outline"
+                        onClick={downloadMergedBills}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Merged Bills (PDF)
                       </Button>
                     </motion.div>
 
@@ -897,11 +1074,11 @@ export default function Reports() {
                         <tr className="border-b border-border">
                           {reportType === 'combined' || reportType === 'item' ? (
                             <>
-                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Item Name</th>
+                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Bill Info</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Type</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Department</th>
-                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Quantity</th>
-                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Amount</th>
+                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Vendor</th>
+                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Total Amount</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Date</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Actions</th>
                             </>
@@ -915,6 +1092,8 @@ export default function Reports() {
                           ) : reportType === 'vendor' ? (
                             <>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Vendor</th>
+                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Items Provided</th>
+                              <th className="text-left p-2 text-sm font-medium text-muted-foreground">Departments</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Total Assets</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Total Amount</th>
                               <th className="text-left p-2 text-sm font-medium text-muted-foreground">Actions</th>
@@ -930,81 +1109,112 @@ export default function Reports() {
                       </thead>
                       <tbody>
                         {data.map((item: any, index: number) => (
-                          <motion.tr
-                            key={index}
-                            className="border-b border-border/50"
-                            variants={itemVariants}
-                            whileHover={{ scale: 1.02 }}
-                          >
-                            {reportType === 'combined' || reportType === 'item' ? (
-                              <>
-                                <td className="p-2 text-sm text-foreground">{item.itemName}</td>
-                                <td className="p-2">
-                                  <Badge
-                                    variant={item.type === 'capital' ? 'default' : 'secondary'}
-                                    className={item.type === 'capital' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}
-                                  >
-                                    {item.type}
-                                  </Badge>
-                                </td>
-                                <td className="p-2 text-sm text-foreground">{item.department?.name || item.department || 'N/A'}</td>
-                                <td className="p-2 text-sm text-foreground">{item.quantity}</td>
-                                <td className="p-2 text-sm font-medium text-foreground">
-                                  ₹{item.totalAmount?.toLocaleString() || '0'}
-                                </td>
-                                <td className="p-2 text-sm text-muted-foreground">{item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'}</td>
-                                <td className="p-2">
-                                  <div className="flex gap-2">
-                                    {(reportType === 'combined' || reportType === 'item') ? (
-                                      <>
-                                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                          <React.Fragment key={item._id || index}>
+                            <motion.tr
+                              className="border-b border-border/50 hover:bg-gray-50"
+                              variants={itemVariants}
+                              whileHover={{ scale: 1.01 }}
+                            >
+                              {reportType === 'combined' || reportType === 'item' ? (
+                                <>
+                                  <td className="p-2">
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => toggleAssetExpansion(item._id)}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        {expandedAssets.has(item._id) ? '−' : '+'}
+                                      </Button>
+                                      <div>
+                                        <div className="text-sm font-medium text-foreground">Bill #{item.billNo}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {item.items?.length || 0} item(s)
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-2">
+                                    <Badge
+                                      variant={item.type === 'capital' ? 'default' : 'secondary'}
+                                      className={item.type === 'capital' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}
+                                    >
+                                      {item.type}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-2 text-sm text-foreground">{item.department?.name || item.department || 'N/A'}</td>
+                                  <td className="p-2 text-sm text-foreground">{item.vendorName}</td>
+                                  <td className="p-2 text-sm font-medium text-foreground">
+                                    ₹{item.grandTotal?.toLocaleString() || item.totalAmount?.toLocaleString() || '0'}
+                                  </td>
+                                  <td className="p-2 text-sm text-muted-foreground">{item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'}</td>
+                                  <td className="p-2">
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => previewBill(item._id)}
+                                        className="h-8 w-8 p-0"
+                                        title="Preview Bill"
+                                      >
+                                        <Eye className="h-3 w-3 text-blue-600" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => downloadSingleBill(item._id, item.billNo)}
+                                        className="h-8 w-8 p-0"
+                                        title="Download Bill"
+                                      >
+                                        <FileDown className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEdit(item)}
+                                        className="h-8 w-8 p-0"
+                                        title="Edit"
+                                      >
+                                        <Edit className="h-3 w-3 text-primary" />
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => handleEdit(item)}
                                             className="h-8 w-8 p-0"
+                                            title="Delete"
                                           >
-                                            <Edit className="h-4 w-4 text-primary" />
+                                            <Trash2 className="h-3 w-3 text-destructive" />
                                           </Button>
-                                        </motion.div>
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 w-8 p-0"
-                                              >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                              </Button>
-                                            </motion.div>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Delete Asset</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                Are you sure you want to delete this asset? This action cannot be undone.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                              <AlertDialogAction
-                                                onClick={() => handleDeleteAsset(item._id)}
-                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                              >
-                                                Delete
-                                              </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                      </>
-                                    ) : null}
-                                  </div>
-                                </td>
-                              </>
-                            ) : reportType === 'vendor' ? (
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Are you sure you want to delete this asset? This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={() => handleDeleteAsset(item._id)}
+                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            >
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </td>
+                                </>
+                              ) : reportType === 'vendor' ? (
                               <>
                                 <td className="p-2 text-sm text-foreground">{item._id}</td>
+                                <td className="p-2 text-sm text-foreground">{item.itemNames?.join(', ') || 'N/A'}</td>
+                                <td className="p-2 text-sm text-foreground">{item.departments?.join(', ') || 'N/A'}</td>
                                 <td className="p-2 text-sm text-foreground">{item.totalAssets || item.count || 1}</td>
                                 <td className="p-2 text-sm font-medium text-foreground">
                                   ₹{item.totalAmount?.toLocaleString() || '0'}
@@ -1105,7 +1315,16 @@ export default function Reports() {
                                 </td>
                               </>
                             )}
-                          </motion.tr>
+                            </motion.tr>
+                            {/* Expanded Items Row */}
+                            {expandedAssets.has(item._id) && (reportType === 'combined' || reportType === 'item') && (
+                              <tr>
+                                <td colSpan={7} className="p-0">
+                                  {renderItemsTable(item.items, item._id, item.billNo)}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </motion.table>
