@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+console.log('Using API Base URL:', API_BASE_URL);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: false,
 });

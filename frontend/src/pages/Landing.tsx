@@ -67,7 +67,8 @@ export default function Landing() {
     const fetchPublicData = async () => {
       try {
         // Fetch all assets for public display
-        const response = await fetch('http://localhost:5000/api/assets');
+        const API_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.com';
+        const response = await fetch(`${API_URL}/api/assets`);
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data.assets) {
@@ -76,7 +77,7 @@ export default function Landing() {
         }
         
         // Fetch all departments for public display
-        const deptResponse = await fetch('http://localhost:5000/api/departments');
+        const deptResponse = await fetch(`${API_URL}/api/departments`);
         if (deptResponse.ok) {
           const deptResult = await deptResponse.json();
           if (deptResult.success && deptResult.data) {
