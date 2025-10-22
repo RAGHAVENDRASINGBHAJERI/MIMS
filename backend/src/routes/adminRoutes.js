@@ -3,7 +3,7 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 import { getAllUsers, createUser, updateUser, deleteUser } from '../controllers/userController.js';
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../controllers/departmentController.js';
 import { getAssets, createAsset, updateAsset, deleteAsset, uploadMiddleware } from '../controllers/assetController.js';
-import { getAuditLogs, getDatabaseStats, getAllUsers as getAdminUsers, getAllAssets as getAdminAssets, getPasswordResetRequests, approvePasswordReset, rejectPasswordReset } from '../controllers/adminController.js';
+import { getAuditLogs, getDatabaseStats, getAllUsers as getAdminUsers, getAllAssets as getAdminAssets, getPasswordResetRequests, approvePasswordReset, rejectPasswordReset, getAdminAnnouncements, updateAnnouncement, deleteAnnouncement } from '../controllers/adminController.js';
 import { validateFileUpload } from '../middleware/security.js';
 import seedDepartments from '../../seedDepartments.js';
 import seedUsers from '../../seedUsers.js';
@@ -23,6 +23,11 @@ router.get('/all-assets', getAdminAssets);
 router.get('/password-reset-requests', getPasswordResetRequests);
 router.post('/password-reset-requests/:requestId/approve', approvePasswordReset);
 router.post('/password-reset-requests/:requestId/reject', rejectPasswordReset);
+
+// Announcement management routes
+router.get('/announcements', getAdminAnnouncements);
+router.put('/announcements/:id', updateAnnouncement);
+router.delete('/announcements/:id', deleteAnnouncement);
 
 // User management routes
 router.route('/users')

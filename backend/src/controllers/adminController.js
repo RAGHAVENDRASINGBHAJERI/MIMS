@@ -4,6 +4,7 @@ import Department from '../models/Department.js';
 import AuditLog from '../models/AuditLog.js';
 import PasswordReset from '../models/PasswordReset.js';
 import PasswordResetRequest from '../models/PasswordResetRequest.js';
+import Announcement from '../models/Announcement.js';
 import crypto from 'crypto';
 
 export const getAuditLogs = async (req, res, next) => {
@@ -224,6 +225,93 @@ export const rejectPasswordReset = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Password reset request rejected'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAdminAnnouncements = async (req, res, next) => {
+  try {
+    const announcements = await Announcement.find()
+      .populate('createdBy', 'name email')
+      .populate('targetDepartments', 'name code')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: announcements
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAnnouncement = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const announcement = await Announcement.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: false }
+    ).populate(['createdBy', 'targetDepartments']);
+
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        error: 'Announcement not found'
+      });
+    }
+
+    // Create audit log
+    await AuditLog.create({
+      entityType: 'ANNOUNCEMENT',
+      entityId: announcement._id,
+      action: 'UPDATE',
+      userId: req.user._id,
+      reason: `Updated announcement: ${Object.keys(updateData).join(', ')}`
+    });
+
+    res.json({
+      success: true,
+      data: announcement
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAnnouncement = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        error: 'Announcement not found'
+      });
+    }
+
+    await Announcement.findByIdAndDelete(id);
+
+    // Create audit log
+    await AuditLog.create({
+      entityType: 'ANNOUNCEMENT',
+      entityId: id,
+      action: 'DELETE',
+      userId: req.user._id,
+      userName: req.user.name,
+      changes: { deleted: announcement.toObject() },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({
+      success: true,
+      message: 'Announcement deleted successfully'
     });
   } catch (error) {
     next(error);

@@ -40,13 +40,10 @@ app.use(limiter);
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://localhost:8082',
-    'http://localhost:8083',
-    'http://localhost:8084',
-    'http://localhost:8085',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'https://your-app.netlify.app',
+    /\.netlify\.app$/,
+    /\.vercel\.app$/
   ],
   credentials: true
 }));
@@ -86,9 +83,11 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
-  }
-});
+  });
+}
+
+export default app;

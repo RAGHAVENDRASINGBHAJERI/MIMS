@@ -917,7 +917,34 @@ export const alertingConfig = {
 };
 ```
 
-### 6.2 Backup & Recovery Procedures
+### 6.2 JWT Token Expiry Management
+```javascript
+// File: backend/src/utils/tokenManager.js
+
+## JWT Token Expiry Handling
+
+### Production Configuration
+- Token expires after JWT_EXPIRES_IN duration (7 days)
+- Frontend auto-refreshes token every 6 days
+- On expiry: user redirected to login page
+- Refresh endpoint: /api/auth/refresh-token
+- Seamless user experience with automatic token renewal
+
+### Implementation Details
+1. Backend refresh token endpoint validates existing token
+2. Frontend sets up automatic refresh interval
+3. AuthContext manages token lifecycle
+4. Error handling for expired tokens
+5. Graceful logout on token validation failure
+
+### Security Benefits
+- Reduced token lifetime minimizes security risk
+- Automatic refresh prevents user interruption
+- Proper cleanup on token expiry
+- Audit trail for token refresh events
+```
+
+### 6.3 Backup & Recovery Procedures
 ```bash
 # File: maintenance/backup-procedures.md
 

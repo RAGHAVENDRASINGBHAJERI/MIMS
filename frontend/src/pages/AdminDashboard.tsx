@@ -72,15 +72,114 @@ export default function AdminDashboard() {
   const { addNotification } = useNotifications();
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
 
-  useEffect(() => {
-    if (!isAdmin) {
-      navigate('/dashboard');
-      return;
+  const fetchAnnouncements = async () => {
+    setLoadingAnnouncements(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/admin/announcements', {
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setAnnouncements(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch announcements:', error);
+    } finally {
+      setLoadingAnnouncements(false);
     }
-    fetchDatabaseStats();
-    fetchAuditLogs();
-  }, [isAdmin, navigate]);
+  };
+
+  const toggleAnnouncementStatus = async (announcementId: string, isActive: boolean) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/announcements/${announcementId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ isActive })
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: `Announcement ${isActive ? 'activated' : 'deactivated'} successfully`,
+        });
+        fetchAnnouncements();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update announcement status',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const deleteAnnouncement = async (announcementId: string) => {
+    if (!confirm('Are you sure you want to delete this announcement?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/announcements/${announcementId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Announcement deleted successfully',
+        });
+        fetchAnnouncements();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete announcement',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCreateAnnouncement = async (data: any) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/announcements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Announcement created successfully',
+        });
+        addNotification({
+          type: 'success',
+          title: 'Announcement Created',
+          message: `New announcement: ${data.title}`
+        });
+        fetchAnnouncements();
+        setShowAnnouncementDialog(false);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create announcement',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const fetchDatabaseStats = async () => {
     try {
@@ -117,6 +216,21 @@ export default function AdminDashboard() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin) {
+      navigate('/dashboard');
+      return;
+    }
+    fetchDatabaseStats();
+    fetchAuditLogs();
+  }, [isAdmin, navigate]);
+
+  useEffect(() => {
+    if (activeTab === 'announcements') {
+      fetchAnnouncements();
+    }
+  }, [activeTab]);
 
   const exportAuditLogs = async () => {
     try {
@@ -490,17 +604,80 @@ export default function AdminDashboard() {
             transition={{ delay: 0.1 }}
           >
             <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-foreground">Announcements</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-foreground">Announcement Management</h2>
                 <Button onClick={() => setShowAnnouncementDialog(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Announcement
                 </Button>
               </div>
-              <div className="text-center py-8">
-                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-2 text-muted-foreground">Announcement management coming soon</p>
-              </div>
+              
+              {loadingAnnouncements ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-muted-foreground">Loading announcements...</p>
+                </div>
+              ) : announcements.length === 0 ? (
+                <div className="text-center py-8">
+                  <Bell className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-2 text-muted-foreground">No announcements found</p>
+                  <p className="text-sm text-muted-foreground">Create your first announcement to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {announcements.map((announcement: any) => (
+                    <div key={announcement._id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-foreground">{announcement.title}</h3>
+                            <Badge 
+                              variant={
+                                announcement.type === 'urgent' ? 'destructive' :
+                                announcement.type === 'report_reminder' ? 'default' :
+                                announcement.type === 'budget_release' ? 'secondary' : 'outline'
+                              }
+                            >
+                              {announcement.type.replace('_', ' ').toUpperCase()}
+                            </Badge>
+                            {announcement.isActive ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactive</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">{announcement.message}</p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>Created: {new Date(announcement.createdAt).toLocaleDateString()}</span>
+                            <span>Expires: {new Date(announcement.expiresAt).toLocaleDateString()}</span>
+                            {announcement.targetDepartments && announcement.targetDepartments.length > 0 ? (
+                              <span>Departments: {announcement.targetDepartments.map((dept: any) => dept.name).join(', ')}</span>
+                            ) : (
+                              <span>All Departments</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => toggleAnnouncementStatus(announcement._id, !announcement.isActive)}
+                          >
+                            {announcement.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteAnnouncement(announcement._id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </motion.div>
         )}
@@ -513,34 +690,5 @@ export default function AdminDashboard() {
     </div>
   );
 
-  async function handleCreateAnnouncement(data: any) {
-    try {
-      const response = await fetch('http://localhost:5000/api/announcements', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
-        },
-        body: JSON.stringify(data)
-      });
 
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Announcement created successfully',
-        });
-        addNotification({
-          type: 'success',
-          title: 'Announcement Created',
-          message: `New announcement: ${data.title}`
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create announcement',
-        variant: 'destructive',
-      });
-    }
-  }
 }

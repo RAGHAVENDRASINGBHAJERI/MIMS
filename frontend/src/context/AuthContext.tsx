@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { setupTokenRefresh } from '@/utils/tokenManager';
 
 interface User {
   _id: string;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         setUser(JSON.parse(storedUser));
         setToken(storedToken);
+        setupTokenRefresh();
       } catch (error) {
         // Clear invalid stored data
         sessionStorage.removeItem('user');
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(authToken);
     sessionStorage.setItem('user', JSON.stringify(userData));
     sessionStorage.setItem('token', authToken);
+    setupTokenRefresh();
   };
 
   const logout = () => {

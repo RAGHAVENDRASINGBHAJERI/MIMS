@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'your-secret-key', {
-    expiresIn: '30d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 };
 
@@ -251,6 +251,51 @@ export const getMe = async (req, res, next) => {
       data: user
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshToken = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'No token provided'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findById(decoded.id).populate('department');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const newToken = generateToken(user._id);
+
+    res.json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        token: newToken
+      }
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        error: 'Token expired'
+      });
+    }
     next(error);
   }
 };

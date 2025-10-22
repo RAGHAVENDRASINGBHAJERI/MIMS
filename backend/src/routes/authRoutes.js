@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe } from '../controllers/authController.js';
+import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe, refreshToken } from '../controllers/authController.js';
 import { disableAfterAdmin } from '../middleware/disableAfterAdmin.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -24,5 +24,8 @@ router.post('/reset-password', resetPassword);
 
 // GET /api/auth/me
 router.get('/me', protect, getMe);
+
+// POST /api/auth/refresh-token
+router.post('/refresh-token', refreshToken);
 
 export default router;
