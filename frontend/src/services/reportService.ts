@@ -28,7 +28,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://mims-1.onrender.co
 export const reportService = {
   // Get department report
   getDepartmentReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -66,7 +66,7 @@ export const reportService = {
 
   // Get vendor report
   getVendorReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -107,7 +107,7 @@ export const reportService = {
 
   // Get item report
   getItemReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -145,7 +145,7 @@ export const reportService = {
 
   // Get year report
   getYearReport: async (): Promise<{ report: any[]; summary: any }> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -173,7 +173,7 @@ export const reportService = {
 
   // Generate report with filters
   generateReport: async (filters: ReportFilters): Promise<ReportData> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -198,7 +198,7 @@ export const reportService = {
 
   // Export report to Excel
   exportToExcel: async (type: string = 'combined', filters: Record<string, string> = {}): Promise<Blob> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -226,7 +226,7 @@ export const reportService = {
 
   // Export report to Word
   exportToWord: async (type: string = 'all'): Promise<Blob> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -245,7 +245,7 @@ export const reportService = {
 
   // Download bills as ZIP
   downloadBills: async (selectedAssetIds: string[], filters: ReportFilters = {}): Promise<Blob> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -273,7 +273,7 @@ export const reportService = {
 
   // Merge and download all filtered bills as single PDF
   downloadMergedBills: async (filters: ReportFilters = {}): Promise<Blob> => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

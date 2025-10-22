@@ -253,40 +253,62 @@ export function Navbar() {
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && isAuthenticated && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-            className="lg:hidden fixed top-14 sm:top-16 left-0 right-0 bg-slate-800 shadow-lg z-40 border-t border-slate-600"
-          >
-            <div className="px-4 py-3 space-y-2">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
-                onClick={() => handleNavigation('/dashboard')}
-              >
-                Dashboard
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
-                onClick={() => handleNavigation('/add-material')}
-              >
-                Add Material
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full text-left px-4 py-3 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium"
-                onClick={() => handleNavigation('/reports')}
-              >
-                Reports
-              </motion.button>
-            </div>
-          </motion.div>
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="lg:hidden fixed inset-0 bg-black/50 z-40"
+              onClick={closeMobileMenu}
+            />
+            
+            {/* Mobile Menu */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="lg:hidden fixed top-14 sm:top-16 left-0 right-0 bg-slate-800 shadow-xl z-50 border-t border-slate-600 max-h-[calc(100vh-4rem)] overflow-y-auto"
+            >
+              <div className="px-4 py-4 space-y-1">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full text-left px-4 py-4 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-3"
+                  onClick={() => handleNavigation('/dashboard')}
+                >
+                  <span>📊</span> Dashboard
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full text-left px-4 py-4 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-3"
+                  onClick={() => handleNavigation('/add-material')}
+                >
+                  <span>➕</span> Add Material
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full text-left px-4 py-4 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-3"
+                  onClick={() => handleNavigation('/reports')}
+                >
+                  <span>📈</span> Reports
+                </motion.button>
+                {user?.role === 'admin' && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full text-left px-4 py-4 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-3"
+                    onClick={() => handleNavigation('/admin')}
+                  >
+                    <span>⚙️</span> Admin
+                  </motion.button>
+                )}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

@@ -14,7 +14,7 @@ export const departmentService = {
   getAllDepartments: async (): Promise<Department[]> => {
     try {
       console.log('Fetching departments from:', `${API_BASE_URL}/api/departments`);
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
