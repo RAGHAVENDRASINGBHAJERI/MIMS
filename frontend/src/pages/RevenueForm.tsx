@@ -647,13 +647,13 @@ export default function RevenueForm() {
                   <Upload className="h-4 w-4 text-cyan-700" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Receipt Upload</h3>
-                  <p className="text-sm text-gray-600">Upload receipt document (PDF only, max 10MB).</p>
+                  <h3 className="text-lg font-semibold text-gray-800">Bill Upload</h3>
+                  <p className="text-sm text-gray-600">Upload Bill document (PDF only, max 10MB).</p>
                 </div>
               </div>
               <div className="max-w-md">
                 <UploadField
-                  label="Receipt File"
+                  label="Bill File"
                   onFileSelect={setSelectedFile}
                   accept={{ "application/pdf": [".pdf"] }}
                   maxSize={10 * 1024 * 1024}
