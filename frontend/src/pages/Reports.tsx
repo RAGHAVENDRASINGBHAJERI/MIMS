@@ -21,6 +21,7 @@ import { departmentService } from '@/services/departmentService';
 import { reportService, type ReportFilters } from '@/services/reportService';
 import { assetService, type Asset, type AssetFormData } from '@/services/assetService';
 import { useToast } from '@/hooks/use-toast';
+import { formatIndianCurrency } from '@/utils/currency';
 import {
   ArrowLeft,
   FileBarChart,
@@ -1087,21 +1088,21 @@ export default function Reports() {
                 {[
                   {
                     label: 'Total Capital',
-                    value: `₹${reportData.summary.totalCapital?.toLocaleString() || '0'}`,
+                    value: formatIndianCurrency(reportData.summary.totalCapital || 0),
                     icon: <DollarSign className="h-8 w-8 text-primary/70" />,
                     key: 'totalCapital',
                     colorClass: 'text-primary',
                   },
                   {
                     label: 'Total Revenue',
-                    value: `₹${reportData.summary.totalRevenue?.toLocaleString() || '0'}`,
+                    value: formatIndianCurrency(reportData.summary.totalRevenue || 0),
                     icon: <TrendingUp className="h-8 w-8 text-success/70" />,
                     key: 'totalRevenue',
                     colorClass: 'text-success',
                   },
                   {
                     label: 'Grand Total',
-                    value: `₹${reportData.summary.grandTotal?.toLocaleString() || '0'}`,
+                    value: formatIndianCurrency(reportData.summary.grandTotal || 0),
                     icon: <Calendar className="h-8 w-8 text-info/70" />,
                     key: 'grandTotal',
                     colorClass: 'text-info',
@@ -1320,7 +1321,7 @@ export default function Reports() {
                                   <td className="p-2 text-sm text-foreground">{item.department?.name || item.department || 'N/A'}</td>
                                   <td className="p-2 text-sm text-foreground">{item.vendorName}</td>
                                   <td className="p-2 text-sm font-medium text-foreground">
-                                    ₹{item.grandTotal?.toLocaleString() || item.totalAmount?.toLocaleString() || '0'}
+                                    {formatIndianCurrency(item.grandTotal || item.totalAmount || 0)}
                                   </td>
                                   <td className="p-2 text-sm text-muted-foreground">{item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'}</td>
                                   <td className="p-2">

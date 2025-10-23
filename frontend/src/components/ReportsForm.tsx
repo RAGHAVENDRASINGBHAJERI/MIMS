@@ -6,6 +6,7 @@ import { FormInput } from '@/components/ui/form-input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { reportService } from '@/services/reportService';
+import { formatIndianCurrency } from '@/utils/currency';
 import { Plus, Trash2, Download } from 'lucide-react';
 
 
@@ -276,7 +277,7 @@ export default function ReportsForm() {
                         />
                       </td>
                       <td className="p-2">
-                        <span className="text-sm font-medium">₹{item.amount.toFixed(2)}</span>
+                        <span className="text-sm font-medium">{formatIndianCurrency(item.amount)}</span>
                       </td>
                       <td className="p-2">
                         <FormInput
@@ -297,7 +298,7 @@ export default function ReportsForm() {
                         />
                       </td>
                       <td className="p-2">
-                        <span className="text-sm font-bold text-primary">₹{item.grandTotal.toFixed(2)}</span>
+                        <span className="text-sm font-bold text-primary">{formatIndianCurrency(item.grandTotal)}</span>
                       </td>
                       <td className="p-2">
                         <FormInput
@@ -337,7 +338,7 @@ export default function ReportsForm() {
 
             {/* Bill Total */}
             <div className="text-right font-semibold mt-4">
-              <span className="text-lg">Bill Total: ₹{getBillTotal(bill).toFixed(2)}</span>
+              <span className="text-lg">Bill Total: {formatIndianCurrency(getBillTotal(bill))}</span>
             </div>
           </Card>
         </motion.div>
@@ -346,7 +347,7 @@ export default function ReportsForm() {
       {/* Overall Total */}
       <Card className="p-6 bg-primary/5 border-primary/20">
         <div className="text-right font-bold text-xl text-primary">
-          Overall Total: ₹{getOverallTotal().toFixed(2)}
+          Overall Total: {formatIndianCurrency(getOverallTotal())}
         </div>
       </Card>
     </div>

@@ -20,9 +20,19 @@ export const getPublicStats = async (req, res, next) => {
     ]);
     const totalValue = totalValueResult[0]?.total || 0;
     
-    const formattedTotalValue = totalValue >= 1000000
-      ? `₹${(totalValue / 1000000).toFixed(1)}M`
-      : `₹${totalValue.toLocaleString()}`;
+    const formatIndianCurrency = (amount) => {
+      if (amount >= 10000000) { // 1 crore
+        return `₹${(amount / 10000000).toFixed(2)} Cr`;
+      } else if (amount >= 100000) { // 1 lakh
+        return `₹${(amount / 100000).toFixed(2)} L`;
+      } else if (amount >= 1000) { // 1 thousand
+        return `₹${(amount / 1000).toFixed(2)} K`;
+      } else {
+        return `₹${amount.toLocaleString('en-IN')}`;
+      }
+    };
+    
+    const formattedTotalValue = formatIndianCurrency(totalValue);
 
     res.json({
       success: true,
