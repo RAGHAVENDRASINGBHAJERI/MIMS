@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,57 +64,35 @@ export default function Landing() {
   const { state, dispatch } = useAssetFlow();
 
   useEffect(() => {
-    const fetchPublicData = async () => {
+    const fetchPublicStats = async () => {
       try {
-        // Fetch all assets for public display
         const API_URL = 'https://mims-1.onrender.com';
-        const response = await fetch(`${API_URL}/api/assets`);
+        const response = await fetch(`${API_URL}/api/public/stats`);
         if (response.ok) {
           const result = await response.json();
-          if (result.success && result.data.assets) {
-            dispatch({ type: 'SET_ASSETS', payload: result.data.assets });
-          }
-        }
-        
-        // Fetch all departments for public display
-        const deptResponse = await fetch(`${API_URL}/api/departments`);
-        if (deptResponse.ok) {
-          const deptResult = await deptResponse.json();
-          if (deptResult.success && deptResult.data) {
-            dispatch({ type: 'SET_DEPARTMENTS', payload: deptResult.data });
+          if (result.success) {
+            setStats([
+              { label: 'Total Assets', value: result.data.totalAssets.toString(), icon: Building2 },
+              { label: 'Departments', value: result.data.totalDepartments.toString(), icon: Users },
+              { label: 'This Month', value: result.data.thisMonthAssets.toString(), icon: Calendar },
+              { label: 'Total Value', value: result.data.totalValue, icon: BarChart3 },
+            ]);
           }
         }
       } catch (error) {
-        console.error('Failed to fetch public data:', error);
+        console.error('Failed to fetch public stats:', error);
       }
     };
 
-    fetchPublicData();
-  }, [dispatch]);
+    fetchPublicStats();
+  }, []);
 
-  // Calculate total value from assets
-  const totalValue = state.assets.reduce((sum, asset) => sum + (asset.totalAmount || 0), 0);
-
-  // Format total value to display in millions with currency symbol
-  const formattedTotalValue = totalValue >= 1000000
-    ? `₹${(totalValue / 1000000).toFixed(1)}M`
-    : `₹${totalValue.toLocaleString()}`;
-
-  // Calculate assets added this month
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const thisMonthAssets = state.assets.filter(asset => {
-    if (!asset.billDate) return false;
-    const assetDate = new Date(asset.billDate);
-    return assetDate.getMonth() === currentMonth && assetDate.getFullYear() === currentYear;
-  }).length;
-
-  const stats = [
-    { label: 'Total Assets', value: state.assets.length.toString(), icon: Building2 },
-    { label: 'Departments', value: state.departments.length.toString(), icon: Users },
-    { label: 'This Month', value: thisMonthAssets.toString(), icon: Calendar },
-    { label: 'Total Value', value: formattedTotalValue, icon: BarChart3 },
-  ];
+  const [stats, setStats] = useState([
+    { label: 'Total Assets', value: '150+', icon: Building2 },
+    { label: 'Departments', value: '8', icon: Users },
+    { label: 'This Month', value: '12', icon: Calendar },
+    { label: 'Total Value', value: '₹2.5M', icon: BarChart3 },
+  ]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-primary/5">
