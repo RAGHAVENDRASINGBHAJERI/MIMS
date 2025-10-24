@@ -23,7 +23,7 @@ export interface ReportData {
   };
 }
 
-const API_BASE_URL = 'https://mims-1.onrender.com';
+const API_BASE_URL = 'http://localhost:5000';
 
 export const reportService = {
   // Get department report
@@ -38,7 +38,7 @@ export const reportService = {
 
     const params = new URLSearchParams();
     Object.entries(filters || {}).forEach(([key, value]) => {
-      if (value && key !== 'academicYear') params.append(key, value);
+      if (value && value !== 'undefined' && key !== 'academicYear') params.append(key, value);
     });
 
     const response = await fetch(`${API_BASE_URL}/api/reports/department?${params.toString()}`, { headers });
@@ -75,12 +75,9 @@ export const reportService = {
     }
 
     const params = new URLSearchParams();
-    if (filters?.vendorName) {
-      params.append('vendorName', filters.vendorName);
-    }
-    if (filters?.type) {
-      params.append('type', filters.type);
-    }
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value && value !== 'undefined' && key !== 'academicYear') params.append(key, value);
+    });
 
     const response = await fetch(`${API_BASE_URL}/api/reports/vendor?${params.toString()}`, { headers });
     const result = await response.json();
@@ -116,9 +113,9 @@ export const reportService = {
     }
 
     const params = new URLSearchParams();
-    if (filters?.itemName) {
-      params.append('itemName', filters.itemName);
-    }
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value && value !== 'undefined' && key !== 'academicYear') params.append(key, value);
+    });
 
     const response = await fetch(`${API_BASE_URL}/api/reports/item?${params.toString()}`, { headers });
     const result = await response.json();
@@ -144,7 +141,7 @@ export const reportService = {
   },
 
   // Get year report
-  getYearReport: async (): Promise<{ report: any[]; summary: any }> => {
+  getYearReport: async (filters?: ReportFilters): Promise<{ report: any[]; summary: any }> => {
     const token = sessionStorage.getItem('token');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -153,7 +150,12 @@ export const reportService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/reports/year`, { headers });
+    const params = new URLSearchParams();
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value && value !== 'undefined' && key !== 'academicYear') params.append(key, value);
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/reports/year?${params.toString()}`, { headers });
     const result = await response.json();
 
     if (!response.ok) {

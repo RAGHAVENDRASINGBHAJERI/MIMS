@@ -51,7 +51,7 @@ const DepartmentDashboard = () => {
 
   const fetchRecentActivity = async () => {
     try {
-      const API_URL = 'https://mims-1.onrender.com';
+      const API_URL = 'http://localhost:5000';
       const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=5&department=${user?.department?._id}`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`

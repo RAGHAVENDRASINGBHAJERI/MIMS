@@ -67,7 +67,7 @@ export default function Landing() {
   useEffect(() => {
     const fetchPublicStats = async () => {
       try {
-        const API_URL = 'https://mims-1.onrender.com';
+        const API_URL = 'http://localhost:5000';
         const response = await fetch(`${API_URL}/api/public/stats`);
         if (response.ok) {
           const result = await response.json();

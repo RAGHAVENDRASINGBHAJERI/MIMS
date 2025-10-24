@@ -20,7 +20,7 @@ function findFiles(dir, extension) {
   return files;
 }
 
-const srcDir = 'c:/Users/ratan/Desktop/assetflow-stream/frontend/src';
+const srcDir = './frontend/src';
 const files = findFiles(srcDir, '.tsx').concat(findFiles(srcDir, '.ts'));
 
 files.forEach(filePath => {

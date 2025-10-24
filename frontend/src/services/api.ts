@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://mims-1.onrender.com';
+const API_BASE_URL = 'http://localhost:5000';
 console.log('Using API Base URL:', API_BASE_URL);
 
 const api = axios.create({

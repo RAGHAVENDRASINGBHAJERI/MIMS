@@ -77,7 +77,7 @@ export interface AssetListResponse {
   };
 }
 
-const API_BASE_URL = 'https://mims-1.onrender.com';
+const API_BASE_URL = 'http://localhost:5000';
 
 export const assetService = {
   // Get all assets

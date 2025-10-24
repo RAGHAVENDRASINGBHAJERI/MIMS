@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://mims-1.onrender.com';
+const API_URL = 'http://localhost:5000';
 
 export const refreshToken = async (): Promise<string | null> => {
   try {

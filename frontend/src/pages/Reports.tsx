@@ -125,7 +125,7 @@ export default function Reports() {
           reportData = await reportService.getDepartmentReport(filters);
           break;
         case 'year':
-          reportData = await reportService.getYearReport();
+          reportData = await reportService.getYearReport(filters);
           break;
         default:
           reportData = await reportService.generateReport(filters);
@@ -289,7 +289,7 @@ export default function Reports() {
 
   const downloadSingleBill = async (assetId: string, billNo: string) => {
     
-    const API_URL = 'https://mims-1.onrender.com';
+    const API_URL = 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/bill`, {
         headers: {
@@ -341,7 +341,7 @@ export default function Reports() {
 
   const handleItemUpdate = async (assetId: string, itemIndex: number, updatedItem: any, reason: string, officerName: string) => {
     
-    const API_URL = 'https://mims-1.onrender.com';
+    const API_URL = 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'PUT',
@@ -370,7 +370,7 @@ export default function Reports() {
 
   const handleItemDelete = async (assetId: string, itemIndex: number, reason: string, officerName: string) => {
     
-    const API_URL = 'https://mims-1.onrender.com';
+    const API_URL = 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'DELETE',
@@ -1193,6 +1193,31 @@ export default function Reports() {
                         </ChartContainer>
                       </div>
                     )}
+                    {/* Bar Chart for Vendors if vendor report */}
+                    {reportType === 'vendor' && reportData.report && (
+                      <div>
+                        <h4 className="text-md font-medium text-foreground mb-2">Vendor-wise Amounts</h4>
+                        <ChartContainer
+                          config={{
+                            amount: { label: "Amount", color: "hsl(var(--success))" },
+                          }}
+                          className="h-[300px]"
+                        >
+                          <BarChart
+                            data={reportData.report.slice(0, 10).map((item: any) => ({
+                              vendor: String(item.vendorName || item._id || 'Unknown').substring(0, 15),
+                              amount: item.totalAmount || 0,
+                            }))}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="vendor" />
+                            <YAxis />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Bar dataKey="amount" fill="hsl(var(--success))" />
+                          </BarChart>
+                        </ChartContainer>
+                      </div>
+                    )}
                   </div>
                 </Card>
               </motion.div>
@@ -1214,7 +1239,7 @@ export default function Reports() {
                     case 'combined':
                       return reportData?.data?.assets?.assets || reportData?.data?.assets || reportData?.assets || [];
                     case 'department':
-                      return reportData?.data?.assets || reportData?.assets || [];
+                      return reportData?.report || reportData?.data?.assets || reportData?.assets || [];
                     case 'vendor':
                     case 'item':
                     case 'year':
@@ -1455,7 +1480,7 @@ export default function Reports() {
                           ) : (
                               <>
                                 <td className="p-2 text-sm text-foreground">{item._id}</td>
-                                <td className="p-2 text-sm text-foreground">{item.totalAssets || item.count || 1}</td>
+                                <td className="p-2 text-sm text-foreground">{item.totalAssets || 0}</td>
                                 <td className="p-2 text-sm font-medium text-foreground">
                                   ₹{item.totalAmount?.toLocaleString() || '0'}
                                 </td>
