@@ -26,8 +26,8 @@ const assetSchema = z.object({
   pricePerItem: z.number().optional(),
   vendorName: z.string().min(1, 'Vendor name is required'),
   vendorAddress: z.string().min(1, 'Vendor address is required'),
-  contactNumber: z.string().min(10, 'Contact number must be at least 10 digits'),
-  email: z.string().email('Invalid email address'),
+  contactNumber: z.string().regex(/^[6-9]\d{9}$/, 'Enter valid 10-digit mobile number starting with 6-9'),
+  email: z.string().email('Enter valid email address'),
   billNo: z.string().min(1, 'Bill number is required'),
   billDate: z.string().min(1, 'Bill date is required'),
   department: z.string().min(1, 'Department is required'),
@@ -509,8 +509,10 @@ export default function CapitalForm() {
                   error={errors.vendorAddress?.message}
                 />
                 <FormInput
-                  label="Vendor Contact"
-                  placeholder="Enter vendor contact number"
+                  label="Vendor Contact *"
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  maxLength={10}
                   {...register('contactNumber', { required: true })}
                   error={errors.contactNumber?.message}
                 />
