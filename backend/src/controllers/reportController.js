@@ -9,7 +9,7 @@ import { getGridFS } from '../utils/gridfs.js';
 
 export const getDepartmentReport = async (req, res, next) => {
   try {
-    const { departmentId } = req.query;
+    const { departmentId, type, startDate, endDate } = req.query;
     const user = req.user;
 
     // Role-based access control
@@ -17,7 +17,7 @@ export const getDepartmentReport = async (req, res, next) => {
 
     if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
       // Admin and CAO can see all departments
-      if (departmentId) {
+      if (departmentId && departmentId !== 'all') {
         filterQuery.department = new mongoose.Types.ObjectId(departmentId);
       }
     } else if (user.role === 'department-officer') {
@@ -37,6 +37,21 @@ export const getDepartmentReport = async (req, res, next) => {
         message: 'Access denied: Insufficient permissions',
         data: null
       });
+    }
+
+    // Apply additional filters
+    if (type) {
+      filterQuery.type = type;
+    }
+
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
     }
 
     // Get detailed assets with populated department info
@@ -69,7 +84,7 @@ export const getDepartmentReport = async (req, res, next) => {
 
 export const getVendorReport = async (req, res, next) => {
   try {
-    const { vendorName, type } = req.query;
+    const { vendorName, type, departmentId, startDate, endDate } = req.query;
     const user = req.user;
 
     // Role-based access control
@@ -77,6 +92,9 @@ export const getVendorReport = async (req, res, next) => {
 
     if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
       // Admin and CAO can see all vendors
+      if (departmentId && departmentId !== 'all') {
+        filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+      }
     } else if (user.role === 'department-officer') {
       // Department officers can only see vendors for their department
       if (!user.department) {
@@ -102,6 +120,16 @@ export const getVendorReport = async (req, res, next) => {
 
     if (type) {
       filterQuery.type = type;
+    }
+
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
     }
 
     // Get detailed assets by vendor instead of aggregated totals
@@ -170,7 +198,7 @@ export const getVendorReport = async (req, res, next) => {
 
 export const getItemReport = async (req, res, next) => {
   try {
-    const { itemName } = req.query;
+    const { itemName, departmentId, type, startDate, endDate } = req.query;
     const user = req.user;
 
     // Role-based access control
@@ -178,6 +206,9 @@ export const getItemReport = async (req, res, next) => {
 
     if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
       // Admin and CAO can see all items
+      if (departmentId && departmentId !== 'all') {
+        filterQuery.department = new mongoose.Types.ObjectId(departmentId);
+      }
     } else if (user.role === 'department-officer') {
       // Department officers can only see items for their department
       if (!user.department) {
@@ -195,6 +226,21 @@ export const getItemReport = async (req, res, next) => {
         message: 'Access denied: Insufficient permissions',
         data: null
       });
+    }
+
+    // Apply additional filters
+    if (type) {
+      filterQuery.type = type;
+    }
+
+    if (startDate || endDate) {
+      filterQuery.billDate = {};
+      if (startDate) {
+        filterQuery.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filterQuery.billDate.$lte = new Date(endDate);
+      }
     }
 
     // Search in both itemName and items.particulars
@@ -262,6 +308,7 @@ export const getItemReport = async (req, res, next) => {
 
 export const getYearReport = async (req, res, next) => {
   try {
+    const { departmentId, type, startDate, endDate } = req.query;
     const user = req.user;
 
     // Role-based access control
@@ -269,6 +316,9 @@ export const getYearReport = async (req, res, next) => {
 
     if (user.role === 'admin' || user.role === 'chief-administrative-officer') {
       // Admin and CAO can see all years
+      if (departmentId && departmentId !== 'all') {
+        matchStage.department = new mongoose.Types.ObjectId(departmentId);
+      }
     } else if (user.role === 'department-officer') {
       // Department officers can only see their department's year data
       if (!user.department) {
@@ -288,8 +338,23 @@ export const getYearReport = async (req, res, next) => {
       });
     }
 
+    // Apply additional filters
+    if (type) {
+      matchStage.type = type;
+    }
+
+    if (startDate || endDate) {
+      matchStage.billDate = {};
+      if (startDate) {
+        matchStage.billDate.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        matchStage.billDate.$lte = new Date(endDate);
+      }
+    }
+
     const report = await Asset.aggregate([
-      { $match: matchStage },
+      { $match: { ...matchStage, billDate: { $ne: null, ...(matchStage.billDate || {}) } } },
       {
         $addFields: {
           calendarYear: { $year: '$billDate' }
@@ -299,9 +364,9 @@ export const getYearReport = async (req, res, next) => {
         $group: {
           _id: '$calendarYear',
           totalAssets: { $sum: 1 },
-          totalAmount: { $sum: '$totalAmount' },
-          totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, '$totalAmount', 0] } },
-          totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, '$totalAmount', 0] } }
+          totalAmount: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } },
+          totalCapital: { $sum: { $cond: [{ $eq: ['$type', 'capital'] }, { $ifNull: ['$grandTotal', '$totalAmount'] }, 0] } },
+          totalRevenue: { $sum: { $cond: [{ $eq: ['$type', 'revenue'] }, { $ifNull: ['$grandTotal', '$totalAmount'] }, 0] } }
         }
       },
       {
