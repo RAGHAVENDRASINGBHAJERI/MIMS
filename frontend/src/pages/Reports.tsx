@@ -1283,7 +1283,7 @@ export default function Reports() {
                       </thead>
                       <tbody>
                         {data.map((item: any, index: number) => (
-                          <React.Fragment key={item._id || index}>
+                          <React.Fragment key={`${item._id}-${index}`}>
                             <motion.tr
                               className="border-b border-border/50 hover:bg-gray-50"
                               variants={itemVariants}
