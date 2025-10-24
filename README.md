@@ -57,11 +57,21 @@ cp config.env.template config.env
 
 4. Configure environment variables in `config.env`:
 ```env
-NODE_ENV=production
+# Server
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/assetflow
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRES_IN=7d
+NODE_ENV=development
+
+# MongoDB
+MONGO_URI=mongodb+srv://ModelGenie:Raghu123@cluster0.dxmpr5a.mongodb.net/assetflow?retryWrites=true&w=majority
+
+# CORS
+CORS_ORIGIN=http://localhost:5173
+
+# JWT
+JWT_SECRET=9edad5ecfac3a82150001c1324a961606429162c6dc0243ffd850e097c46fb4804276db27ccc55d6626c9c49df1cc1d21700011630e2035ae197c800c5f77d61
+
+# GridFS Bucket Name
+GRIDFS_BUCKET=bills
 ```
 
 5. Seed the database (optional):
@@ -127,7 +137,7 @@ Ensure all environment variables are properly set for production:
 
 **Backend (`config.env`):**
 - `NODE_ENV=production`
-- `MONGODB_URI` - Your production MongoDB connection string
+- `MONGO_URI` - Your production MongoDB connection string
 - `JWT_SECRET` - Strong secret key for JWT tokens
 - `PORT` - Server port (default: 5000)
 

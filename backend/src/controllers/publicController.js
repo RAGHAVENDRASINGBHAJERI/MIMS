@@ -16,7 +16,7 @@ export const getPublicStats = async (req, res, next) => {
     });
     
     const totalValueResult = await Asset.aggregate([
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$grandTotal', '$totalAmount'] } } } }
     ]);
     const totalValue = totalValueResult[0]?.total || 0;
     
