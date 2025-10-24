@@ -51,11 +51,13 @@ export const departmentService = {
   },
 
   // Create new department
-  createDepartment: async (department: Omit<Department, 'id' | 'createdAt'>): Promise<Department> => {
+  createDepartment: async (department: Omit<Department, '_id' | 'createdAt'>): Promise<Department> => {
+    const token = sessionStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/api/departments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(department),
     });
@@ -67,5 +69,42 @@ export const departmentService = {
     }
     
     return result.data;
+  },
+
+  // Update department
+  updateDepartment: async (id: string, department: Omit<Department, '_id' | 'createdAt'>): Promise<Department> => {
+    const token = sessionStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/departments/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(department),
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+    }
+    
+    return result.data;
+  },
+
+  // Delete department
+  deleteDepartment: async (id: string): Promise<void> => {
+    const token = sessionStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/departments/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.error || `HTTP error! status: ${response.status}`);
+    }
   },
 };

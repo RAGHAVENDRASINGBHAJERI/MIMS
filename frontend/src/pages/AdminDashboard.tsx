@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/context/NotificationContext';
 import UserManagement from '@/components/UserManagement';
 import NotificationPanel from '@/components/NotificationPanel';
+import DepartmentManagement from '@/components/DepartmentManagement';
 import { AnnouncementDialog } from '@/components/AnnouncementDialog';
 import {
   ArrowLeft,
@@ -68,7 +69,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'notifications' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'departments' | 'notifications' | 'announcements'>('overview');
   const { addNotification } = useNotifications();
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
@@ -404,6 +405,13 @@ export default function AdminDashboard() {
               User Management
             </Button>
             <Button
+              variant={activeTab === 'departments' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('departments')}
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Departments
+            </Button>
+            <Button
               variant={activeTab === 'notifications' ? 'default' : 'outline'}
               onClick={() => setActiveTab('notifications')}
             >
@@ -602,6 +610,16 @@ export default function AdminDashboard() {
             transition={{ delay: 0.1 }}
           >
             <UserManagement />
+          </motion.div>
+        )}
+
+        {activeTab === 'departments' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <DepartmentManagement />
           </motion.div>
         )}
 
