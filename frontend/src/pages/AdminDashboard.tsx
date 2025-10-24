@@ -76,7 +76,7 @@ export default function AdminDashboard() {
 
   const fetchAnnouncements = async () => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     setLoadingAnnouncements(true);
     try {
       const response = await fetch(`${API_URL}/api/admin/announcements`, {
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
 
   const toggleAnnouncementStatus = async (announcementId: string, isActive: boolean) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/admin/announcements/${announcementId}`, {
         method: 'PUT',
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
 
   const deleteAnnouncement = async (announcementId: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     if (!confirm('Are you sure you want to delete this announcement?')) return;
 
     try {
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
 
   const handleCreateAnnouncement = async (data: any) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/announcements`, {
         method: 'POST',
@@ -191,7 +191,7 @@ export default function AdminDashboard() {
 
   const fetchDatabaseStats = async () => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/admin/database-stats`, {
         headers: {
@@ -210,7 +210,7 @@ export default function AdminDashboard() {
 
   const fetchAuditLogs = async () => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=20`, {
         headers: {
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
 
   const exportAuditLogs = async () => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=1000`, {
         headers: {
@@ -289,7 +289,7 @@ export default function AdminDashboard() {
 
   const approvePasswordReset = async (requestId: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
         method: 'POST',
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
 
   const rejectPasswordReset = async (requestId: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const reason = prompt('Please provide a reason for rejection:');
     if (!reason) return;
 

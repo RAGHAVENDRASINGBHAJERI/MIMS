@@ -25,7 +25,7 @@ export function PasswordResetDialog({ open, onOpenChange }: PasswordResetDialogP
 
     setIsLoading(true);
     try {
-      const API_URL = 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(`${API_URL}/api/auth/request-password-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +70,7 @@ export function PasswordResetDialog({ open, onOpenChange }: PasswordResetDialogP
 
     setIsLoading(true);
     try {
-      const API_URL = 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(`${API_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

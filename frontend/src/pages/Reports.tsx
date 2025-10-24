@@ -289,7 +289,7 @@ export default function Reports() {
 
   const downloadSingleBill = async (assetId: string, billNo: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/bill`, {
         headers: {
@@ -341,7 +341,7 @@ export default function Reports() {
 
   const handleItemUpdate = async (assetId: string, itemIndex: number, updatedItem: any, reason: string, officerName: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'PUT',
@@ -370,7 +370,7 @@ export default function Reports() {
 
   const handleItemDelete = async (assetId: string, itemIndex: number, reason: string, officerName: string) => {
     
-    const API_URL = 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
       const response = await fetch(`${API_URL}/api/assets/${assetId}/items`, {
         method: 'DELETE',
