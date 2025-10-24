@@ -69,3 +69,24 @@ export const authorize = (...roles) => {
     next();
   };
 };
+
+// Admin only middleware
+export const adminOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized',
+      data: null
+    });
+  }
+
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required',
+      data: null
+    });
+  }
+
+  next();
+};
