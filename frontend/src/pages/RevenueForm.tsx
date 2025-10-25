@@ -388,40 +388,7 @@ export default function RevenueForm() {
               </div>
             </motion.div>
 
-            {/* Bill Totals */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="border-b border-gray-200 pb-6"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center shadow-sm">
-                  <Calculator className="h-4 w-4 text-teal-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Bill Totals</h3>
-                  <p className="text-sm text-gray-600">Aggregated from all items.</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormInput
-                  label="Total Amount (₹)"
-                  type="number"
-                  value={billTotalAmount}
-                  readOnly
-                  className="bg-gray-50"
-                />
-                <FormInput
-                  label="Grand Total (₹)"
-                  type="number"
-                  value={billGrandTotal}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-            </motion.div>
-
+            
             {/* Item Details Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
