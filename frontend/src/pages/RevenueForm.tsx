@@ -487,7 +487,9 @@ export default function RevenueForm() {
                         </div>
                       </div>
                       <div className="md:col-span-6 flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                        {idx === items.length - 1 && (
+                          <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                        )}
                         {items.length > 1 && (
                           <Button type="button" variant="destructive" onClick={() => setItems(items.filter((_, i) => i !== idx))}>Remove</Button>
                         )}
