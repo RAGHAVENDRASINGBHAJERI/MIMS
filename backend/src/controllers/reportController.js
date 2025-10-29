@@ -60,8 +60,8 @@ export const getDepartmentReport = async (req, res, next) => {
       .lean()
       .sort({ billDate: -1 });
 
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
+    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
 
     res.json({
@@ -284,8 +284,8 @@ export const getItemReport = async (req, res, next) => {
       }
     });
 
-    const totalCapital = report.reduce((sum, item) => sum + (item.type === 'capital' ? (item.grandTotal || item.totalAmount || 0) : 0), 0);
-    const totalRevenue = report.reduce((sum, item) => sum + (item.type === 'revenue' ? (item.grandTotal || item.totalAmount || 0) : 0), 0);
+    const totalCapital = report.reduce((sum, item) => sum + (item.type === 'capital' ? (Number(item.grandTotal) || Number(item.totalAmount) || 0) : 0), 0);
+    const totalRevenue = report.reduce((sum, item) => sum + (item.type === 'revenue' ? (Number(item.grandTotal) || Number(item.totalAmount) || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
 
     res.json({
@@ -476,8 +476,8 @@ export const exportExcel = async (req, res, next) => {
     filename = typeNames[type] || 'assets_report.xlsx';
 
     // Calculate summary for all report types
-    const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
+    const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
     const itemCount = report.length;
 
@@ -803,8 +803,8 @@ export const exportWord = async (req, res, next) => {
           .sort({ billDate: -1 });
 
         // Calculate summary for combined report
-        const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.totalAmount || 0) : 0), 0);
-        const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.totalAmount || 0) : 0), 0);
+        const totalCapital = report.reduce((sum, asset) => sum + (asset.type === 'capital' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
+        const totalRevenue = report.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
         const grandTotal = totalCapital + totalRevenue;
         const itemCount = report.length;
 
@@ -968,8 +968,8 @@ export const getCombinedReport = async (req, res, next) => {
 
     const assets = await Asset.find(filterQuery).populate('department', 'name').lean();
 
-    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
-    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (asset.grandTotal || asset.totalAmount || 0) : 0), 0);
+    const totalCapital = assets.reduce((sum, asset) => sum + (asset.type === 'capital' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
+    const totalRevenue = assets.reduce((sum, asset) => sum + (asset.type === 'revenue' ? (Number(asset.grandTotal) || Number(asset.totalAmount) || 0) : 0), 0);
     const grandTotal = totalCapital + totalRevenue;
     const itemCount = assets.length;
 
@@ -1151,7 +1151,7 @@ export const exportMergedBillsPDF = async (req, res, next) => {
     doc.moveDown(2);
 
     // Add summary
-    const totalAmount = assets.reduce((sum, asset) => sum + (asset.grandTotal || asset.totalAmount || 0), 0);
+    const totalAmount = assets.reduce((sum, asset) => sum + (Number(asset.grandTotal) || Number(asset.totalAmount) || 0), 0);
     const capitalAssets = assets.filter(a => a.type === 'capital');
     const revenueAssets = assets.filter(a => a.type === 'revenue');
     

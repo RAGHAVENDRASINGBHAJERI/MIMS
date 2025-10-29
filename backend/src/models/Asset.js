@@ -122,6 +122,41 @@ const assetSchema = new mongoose.Schema({
   remark: {
     type: String,
     trim: true
+  },
+  // Update approval workflow fields
+  updateRequestStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none'
+  },
+  requestedFields: {
+    type: [String],
+    default: []
+  },
+  tempValues: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  requestedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  requestedAt: {
+    type: Date
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  reviewedAt: {
+    type: Date
+  },
+  adminRemarks: {
+    type: String,
+    trim: true
+  },
+  tempBillFileId: {
+    type: mongoose.Schema.Types.ObjectId
   }
 }, {
   timestamps: true
@@ -157,16 +192,12 @@ assetSchema.pre('save', function(next) {
       };
     });
     this.totalAmount = this.items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
-    if (!this.grandTotal) {
-      this.grandTotal = this.items.reduce((sum, it) => sum + (Number(it.grandTotal) || 0), 0);
-    }
+    this.grandTotal = this.items.reduce((sum, it) => sum + (Number(it.grandTotal) || 0), 0);
   } else if (this.quantity != null && this.pricePerItem != null) {
     this.totalAmount = (Number(this.quantity) || 0) * (Number(this.pricePerItem) || 0);
     // Calculate tax for single item
     const tax = this.totalAmount * ((Number(this.cgst) || 0) + (Number(this.sgst) || 0) + (Number(this.igst) || 0)) / 100;
-    if (!this.grandTotal) {
-      this.grandTotal = this.totalAmount + tax;
-    }
+    this.grandTotal = this.totalAmount + tax;
   }
   next();
 });

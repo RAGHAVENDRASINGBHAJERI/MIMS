@@ -1,5 +1,6 @@
 import express from 'express';
 import { createAsset, getAssets, getAsset, downloadBill, updateAsset, deleteAsset, updateAssetItem, deleteAssetItem, uploadMiddleware, previewBill } from '../controllers/assetController.js';
+import { requestAssetUpdate, getPendingUpdates, approveAssetUpdate, rejectAssetUpdate } from '../controllers/updateRequestController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { validateFileUpload } from '../middleware/security.js';
 
@@ -33,6 +34,9 @@ router.post('/', protect, authorize('admin', 'department-officer'), (req, res, n
 
 // GET /api/assets - Get all assets
 router.get('/', protect, getAssets);
+
+// Update request routes (must come before /:id routes)
+router.get('/pending-updates', protect, authorize('admin'), getPendingUpdates);
 
 // GET /api/assets/:id - Get single asset
 router.get('/:id', protect, getAsset);
@@ -77,5 +81,10 @@ router.put('/:id/items', protect, authorize('admin', 'department-officer'), upda
 
 // DELETE /api/assets/:id/items - Delete specific item
 router.delete('/:id/items', protect, authorize('admin', 'department-officer'), deleteAssetItem);
+
+// Update request routes (remaining routes)
+router.post('/:id/request-update', protect, authorize('department-officer'), requestAssetUpdate);
+router.post('/:id/approve-update', protect, authorize('admin'), approveAssetUpdate);
+router.post('/:id/reject-update', protect, authorize('admin'), rejectAssetUpdate);
 
 export default router;

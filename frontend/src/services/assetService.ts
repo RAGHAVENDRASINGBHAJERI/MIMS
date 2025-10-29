@@ -266,4 +266,90 @@ export const assetService = {
 
     return response.blob();
   },
+
+  // Request asset update
+  requestAssetUpdate: async (assetId: string, requestedFields: string[], tempValues: any): Promise<void> => {
+    const token = sessionStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/assets/${assetId}/request-update`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ requestedFields, tempValues }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
+    }
+  },
+
+  // Get pending updates
+  getPendingUpdates: async (): Promise<any[]> => {
+    const token = sessionStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/assets/pending-updates`, { headers });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return result.data;
+  },
+
+  // Approve asset update
+  approveAssetUpdate: async (assetId: string, adminRemarks?: string): Promise<void> => {
+    const token = sessionStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/assets/${assetId}/approve-update`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ adminRemarks }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
+    }
+  },
+
+  // Reject asset update
+  rejectAssetUpdate: async (assetId: string, adminRemarks?: string): Promise<void> => {
+    const token = sessionStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/assets/${assetId}/reject-update`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ adminRemarks }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.message || `HTTP error! status: ${response.status}`);
+    }
+  },
 };

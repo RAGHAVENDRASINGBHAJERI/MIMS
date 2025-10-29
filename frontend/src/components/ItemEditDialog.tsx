@@ -118,19 +118,40 @@ export function ItemEditDialog({
         grandTotal: calcGrandTotal
       };
 
-      await onItemUpdate(assetId, itemIndex, updatedItem, reason, officerName);
+      // Submit update request instead of direct update
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/assets/${assetId}/request-update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          requestedFields: ['items'],
+          tempValues: {
+            itemIndex,
+            updatedItem,
+            reason,
+            officerName
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit update request');
+      }
       
       setShowUpdateReasonDialog(false);
       onOpenChange(false);
       
       toast({
         title: 'Success',
-        description: 'Item updated successfully',
+        description: 'Item update request submitted for admin approval',
       });
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update item',
+        description: 'Failed to submit update request',
         variant: 'destructive',
       });
     } finally {
@@ -140,19 +161,40 @@ export function ItemEditDialog({
 
   const handleDeleteItem = async (reason: string, officerName: string) => {
     try {
-      await onItemDelete(assetId, itemIndex, reason, officerName);
+      // Submit delete request instead of direct delete
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/assets/${assetId}/request-update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          requestedFields: ['deleteItem'],
+          tempValues: {
+            itemIndex,
+            action: 'delete',
+            reason,
+            officerName
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit delete request');
+      }
       
       setShowDeleteReasonDialog(false);
       onOpenChange(false);
       
       toast({
         title: 'Success',
-        description: 'Item deleted successfully',
+        description: 'Item delete request submitted for admin approval',
       });
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to delete item',
+        description: 'Failed to submit delete request',
         variant: 'destructive',
       });
     }

@@ -12,8 +12,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ReasonDialog } from '@/components/ReasonDialog';
 import { OfficerReasonDialog } from '@/components/OfficerReasonDialog';
 import { ItemEditDialog } from '@/components/ItemEditDialog';
+import { UpdateRequestDialog } from '@/components/UpdateRequestDialog';
+import { ItemUpdateRequestDialog } from '@/components/ItemUpdateRequestDialog';
 import { useNotifications } from '@/context/NotificationContext';
-import NotificationPanel from '@/components/NotificationPanel';
+import { NotificationPanel } from '@/components/NotificationPanel';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useAssetFlow } from '@/context/AssetFlowContext';
 import { useAuth } from '@/context/AuthContext';
@@ -82,6 +84,9 @@ export default function Reports() {
   const [activeTab, setActiveTab] = useState<'reports' | 'notifications'>('reports');
   const [showOfficerUpdateDialog, setShowOfficerUpdateDialog] = useState(false);
   const [showOfficerDeleteDialog, setShowOfficerDeleteDialog] = useState(false);
+  const [showUpdateRequestDialog, setShowUpdateRequestDialog] = useState(false);
+  const [selectedAssetForUpdate, setSelectedAssetForUpdate] = useState<Asset | null>(null);
+  const [showItemUpdateRequestDialog, setShowItemUpdateRequestDialog] = useState(false);
 
   useEffect(() => {
     const fetchDepartments = async () => {
@@ -333,10 +338,19 @@ export default function Reports() {
   };
 
   const handleItemEdit = (item: any, itemIndex: number, assetId: string) => {
-    setSelectedItem(item);
-    setSelectedItemIndex(itemIndex);
-    setSelectedAssetId(assetId);
-    setShowItemEditDialog(true);
+    if (isAdmin || isChiefAdministrativeOfficer) {
+      // Admins use direct edit dialog
+      setSelectedItem(item);
+      setSelectedItemIndex(itemIndex);
+      setSelectedAssetId(assetId);
+      setShowItemEditDialog(true);
+    } else {
+      // Department officers use request dialog
+      setSelectedItem(item);
+      setSelectedItemIndex(itemIndex);
+      setSelectedAssetId(assetId);
+      setShowItemUpdateRequestDialog(true);
+    }
   };
 
   const handleItemUpdate = async (assetId: string, itemIndex: number, updatedItem: any, reason: string, officerName: string) => {
@@ -1369,6 +1383,22 @@ export default function Reports() {
                                       >
                                         <FileDown className="h-3 w-3 text-green-600" />
                                       </Button>
+                                      
+                                      {!isAdmin && !isChiefAdministrativeOfficer && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedAssetForUpdate(item);
+                                            setShowUpdateRequestDialog(true);
+                                          }}
+                                          className="h-8 w-8 p-0"
+                                          title="Request Update"
+                                        >
+                                          <Edit className="h-3 w-3 text-primary" />
+                                        </Button>
+                                      )}
+
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1546,6 +1576,34 @@ export default function Reports() {
           assetId={selectedAssetId}
           onItemUpdate={handleItemUpdate}
           onItemDelete={handleItemDelete}
+        />
+        
+        <UpdateRequestDialog
+          open={showUpdateRequestDialog}
+          onOpenChange={setShowUpdateRequestDialog}
+          asset={selectedAssetForUpdate}
+          onRequestSubmitted={() => {
+            generateReport(false);
+            toast({
+              title: 'Success',
+              description: 'Update request submitted successfully'
+            });
+          }}
+        />
+        
+        <ItemUpdateRequestDialog
+          open={showItemUpdateRequestDialog}
+          onOpenChange={setShowItemUpdateRequestDialog}
+          item={selectedItem}
+          itemIndex={selectedItemIndex}
+          assetId={selectedAssetId}
+          onRequestSubmitted={() => {
+            generateReport(false);
+            toast({
+              title: 'Success',
+              description: 'Item update request submitted successfully'
+            });
+          }}
         />
       </div>
     </div>

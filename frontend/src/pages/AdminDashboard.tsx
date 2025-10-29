@@ -8,9 +8,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/context/NotificationContext';
 import UserManagement from '@/components/UserManagement';
-import NotificationPanel from '@/components/NotificationPanel';
+import { NotificationPanel } from '@/components/NotificationPanel';
 import DepartmentManagement from '@/components/DepartmentManagement';
 import { AnnouncementDialog } from '@/components/AnnouncementDialog';
+import { UpdateAssetsPanel } from '@/components/UpdateAssetsPanel';
 import {
   ArrowLeft,
   Database,
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'departments' | 'notifications' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'departments' | 'notifications' | 'announcements' | 'updates'>('overview');
   const { addNotification } = useNotifications();
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
@@ -425,6 +426,13 @@ export default function AdminDashboard() {
               <FileText className="h-4 w-4 mr-2" />
               Announcements
             </Button>
+            <Button
+              variant={activeTab === 'updates' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('updates')}
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Update Assets
+            </Button>
           </div>
         </motion.div>
 
@@ -630,6 +638,16 @@ export default function AdminDashboard() {
             transition={{ delay: 0.1 }}
           >
             <NotificationPanel />
+          </motion.div>
+        )}
+
+        {activeTab === 'updates' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <UpdateAssetsPanel />
           </motion.div>
         )}
 
