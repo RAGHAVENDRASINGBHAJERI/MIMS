@@ -3,7 +3,7 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 import { getAllUsers, createUser, updateUser, deleteUser } from '../controllers/userController.js';
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../controllers/departmentController.js';
 import { getAssets, createAsset, updateAsset, deleteAsset, uploadMiddleware } from '../controllers/assetController.js';
-import { getAuditLogs, getDatabaseStats, getAllUsers as getAdminUsers, getAllAssets as getAdminAssets, getPasswordResetRequests, approvePasswordReset, rejectPasswordReset, getAdminAnnouncements, updateAnnouncement, deleteAnnouncement } from '../controllers/adminController.js';
+import { getAuditLogs, getDatabaseStats, getAllUsers as getAdminUsers, getAllAssets as getAdminAssets, getPasswordResetRequests, approvePasswordReset, rejectPasswordReset, getAdminAnnouncements, updateAnnouncement, deleteAnnouncement, clearAuditLogs } from '../controllers/adminController.js';
 import { validateFileUpload } from '../middleware/security.js';
 import seedDepartments from '../../seedDepartments.js';
 import seedUsers from '../../seedUsers.js';
@@ -17,6 +17,7 @@ router.use(authorize('admin'));
 
 // Admin-only database access routes
 router.get('/audit-logs', getAuditLogs);
+router.delete('/clear-audit-logs', clearAuditLogs);
 router.get('/database-stats', getDatabaseStats);
 router.get('/all-users', getAdminUsers);
 router.get('/all-assets', getAdminAssets);

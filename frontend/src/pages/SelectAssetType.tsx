@@ -32,20 +32,7 @@ export default function SelectAssetType() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="mb-6"
         >
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/')}
-              className="mb-4 hover:bg-gray-100 transition-all duration-300"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </motion.div>
+         
 
           <motion.div
             className="mb-2"

@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 
 const itemSchema = new mongoose.Schema({
   particulars: { type: String, trim: true },
+  serialNumber: { type: String, trim: true },
+  serialNumbers: [{ type: String, trim: true }],
   quantity: { type: Number, min: [0, 'Quantity cannot be negative'] },
   rate: { type: Number, min: [0, 'Rate cannot be negative'] },
   cgst: { type: Number, default: 0, min: [0, 'CGST cannot be negative'] },

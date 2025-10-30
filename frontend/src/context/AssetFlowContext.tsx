@@ -30,7 +30,7 @@ const initialState: AssetFlowState = {
   assets: [],
   loading: false,
   error: null,
-  sidebarOpen: true,
+  sidebarOpen: false,
 };
 
 // Reducer

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { FormInput } from '@/components/ui/form-input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAssetFlow } from '@/context/AssetFlowContext';
@@ -150,6 +151,62 @@ export function UpdateRequestDialog({ open, onOpenChange, asset, onRequestSubmit
                         handleValueChange(fieldId, newItems);
                       }}
                     />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Serial Numbers</Label>
+                    <div className="space-y-1">
+                      {(item.serialNumbers || [String(item.serialNumber || '')]).map((serial, serialIdx) => (
+                        <div key={serialIdx} className="flex gap-1">
+                          <FormInput
+                            placeholder="e.g. TM0H34A000881"
+                            className="text-xs"
+                            value={serial}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              if (!newItems[index].serialNumbers) {
+                                newItems[index].serialNumbers = [String(newItems[index].serialNumber || '')];
+                              }
+                              newItems[index].serialNumbers[serialIdx] = e.target.value;
+                              handleValueChange(fieldId, newItems);
+                            }}
+                          />
+                          {(item.serialNumbers || []).length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                const newItems = [...items];
+                                if (!newItems[index].serialNumbers) {
+                                  newItems[index].serialNumbers = [String(newItems[index].serialNumber || '')];
+                                }
+                                newItems[index].serialNumbers = newItems[index].serialNumbers.filter((_, i) => i !== serialIdx);
+                                handleValueChange(fieldId, newItems);
+                              }}
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => {
+                          const newItems = [...items];
+                          if (!newItems[index].serialNumbers) {
+                            newItems[index].serialNumbers = [String(newItems[index].serialNumber || '')];
+                          }
+                          newItems[index].serialNumbers.push('');
+                          handleValueChange(fieldId, newItems);
+                        }}
+                      >
+                        + Add Serial
+                      </Button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>

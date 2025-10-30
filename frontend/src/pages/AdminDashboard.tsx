@@ -21,7 +21,10 @@ import {
   Eye,
   Download,
   Bell,
-  Plus
+  Plus,
+  Key,
+  UserCog,
+  Trash2
 } from 'lucide-react';
 
 interface AuditLog {
@@ -34,6 +37,11 @@ interface AuditLog {
     name: string;
     email: string;
     role: string;
+  };
+  officerName?: string;
+  billInfo?: {
+    billNumber: string;
+    vendorName: string;
   };
   reason: string;
   timestamp: string;
@@ -57,6 +65,7 @@ interface DatabaseStats {
       name: string;
       email: string;
       role: string;
+      department?: string;
     };
     reason: string;
     createdAt: string;
@@ -214,15 +223,22 @@ export default function AdminDashboard() {
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     try {
+      console.log('Fetching audit logs from:', `${API_URL}/api/admin/audit-logs?limit=20`);
       const response = await fetch(`${API_URL}/api/admin/audit-logs?limit=20`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
+      console.log('Audit logs response status:', response.status);
       if (response.ok) {
         const result = await response.json();
-        setAuditLogs(result.data.logs);
+        console.log('Audit logs result:', result);
+        setAuditLogs(result.data.logs || []);
+      } else {
+        console.error('Failed to fetch audit logs, status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
       }
     } catch (error) {
       console.error('Failed to fetch audit logs:', error);
@@ -246,6 +262,37 @@ export default function AdminDashboard() {
     }
   }, [activeTab]);
 
+  const clearAuditLogs = async () => {
+    if (!confirm('Are you sure you want to clear all audit logs? This action cannot be undone.')) return;
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    try {
+      const response = await fetch(`${API_URL}/api/admin/clear-audit-logs`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        setAuditLogs([]);
+        toast({
+          title: 'Success',
+          description: 'All audit logs cleared successfully',
+        });
+        fetchDatabaseStats(); // Refresh stats
+      } else {
+        throw new Error('Failed to clear audit logs');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear audit logs',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const exportAuditLogs = async () => {
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -259,9 +306,9 @@ export default function AdminDashboard() {
       if (response.ok) {
         const result = await response.json();
         const csvContent = [
-          'Timestamp,Action,Entity Type,User,Email,Reason',
+          'Timestamp,Action,Entity Type,User,Email,Officer,Bill Number,Vendor,Reason',
           ...result.data.logs.map((log: AuditLog) => 
-            `${new Date(log.timestamp).toLocaleString()},${log.action},${log.entityType},${log.userId.name},${log.userId.email},"${log.reason}"`
+            `${new Date(log.timestamp).toLocaleString()},${log.action},${log.entityType},${log.userId?.name || 'Unknown User'},${log.userId?.email || 'No email'},${log.action === 'DELETE' ? (log.officerName || 'N/A') : 'N/A'},${log.billInfo?.billNumber || 'N/A'},${log.billInfo?.vendorName || 'N/A'},"${log.reason}"`
           )
         ].join('\n');
 
@@ -290,27 +337,55 @@ export default function AdminDashboard() {
   };
 
   const approvePasswordReset = async (requestId: string) => {
-    
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    
+    const request = stats?.pendingPasswordResets.find(r => r._id === requestId);
+    if (!request) return;
+
     try {
-      const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
-        method: 'POST',
+      const usersResponse = await fetch(`${API_URL}/api/admin/all-users`, {
         headers: {
           'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
+      
+      if (usersResponse.ok) {
+        const usersResult = await usersResponse.json();
+        const existingUser = usersResult.data.find((u: any) => u.email === request.userId.email);
+        
+        if (!existingUser) {
+          toast({
+            title: 'Error',
+            description: 'User not found in system',
+            variant: 'destructive',
+          });
+          return;
+        }
 
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Password reset request approved',
+        const response = await fetch(`${API_URL}/api/admin/password-reset-requests/${requestId}/approve`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+          }
         });
-        addNotification({
-          type: 'success',
-          title: 'Password Reset Approved',
-          message: 'Password reset request has been approved successfully'
-        });
-        fetchDatabaseStats();
+
+        if (response.ok) {
+          toast({
+            title: 'Success',
+            description: 'Password reset approved. Redirecting to edit user...',
+          });
+          
+          sessionStorage.setItem('editUserData', JSON.stringify({
+            _id: existingUser._id,
+            name: existingUser.name,
+            email: existingUser.email,
+            role: existingUser.role,
+            department: existingUser.department?._id || null
+          }));
+          
+          setActiveTab('users');
+          fetchDatabaseStats();
+        }
       }
     } catch (error) {
       toast({
@@ -370,14 +445,7 @@ export default function AdminDashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/dashboard')}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
+          
           
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -385,12 +453,30 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-              <p className="text-muted-foreground">Full database access and audit logs</p>
+              <p className="text-muted-foreground">Welcome, {user?.name} | Full database access and audit logs</p>
             </div>
           </div>
           
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/password-reset')}
+            >
+              <Key className="h-4 w-4 mr-2" />
+              Change Password
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/management')}
+            >
+              <UserCog className="h-4 w-4 mr-2" />
+              Admin Management
+            </Button>
+          </div>
+          
           {/* Tab Navigation */}
-          <div className="flex gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6">
             <Button
               variant={activeTab === 'overview' ? 'default' : 'outline'}
               onClick={() => setActiveTab('overview')}
@@ -444,7 +530,7 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6"
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6"
               >
             <Card className="p-6">
               <div className="flex items-center justify-between">
@@ -546,10 +632,16 @@ export default function AdminDashboard() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-foreground">Recent Audit Logs</h2>
-              <Button onClick={exportAuditLogs} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export All Logs
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={clearAuditLogs} variant="destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All Logs
+                </Button>
+                <Button onClick={exportAuditLogs} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export All Logs
+                </Button>
+              </div>
             </div>
 
             {isLoading ? (
@@ -571,6 +663,8 @@ export default function AdminDashboard() {
                       <th className="text-left p-2 text-sm font-medium text-muted-foreground">Action</th>
                       <th className="text-left p-2 text-sm font-medium text-muted-foreground">Entity</th>
                       <th className="text-left p-2 text-sm font-medium text-muted-foreground">User</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Officer</th>
+                      <th className="text-left p-2 text-sm font-medium text-muted-foreground">Bill Info</th>
                       <th className="text-left p-2 text-sm font-medium text-muted-foreground">Reason</th>
                     </tr>
                   </thead>
@@ -593,9 +687,15 @@ export default function AdminDashboard() {
                         <td className="p-2 text-sm text-foreground">{log.entityType}</td>
                         <td className="p-2">
                           <div>
-                            <div className="text-sm font-medium text-foreground">{log.userId.name}</div>
-                            <div className="text-xs text-muted-foreground">{log.userId.email}</div>
+                            <div className="text-sm font-medium text-foreground">{log.userId?.name || 'Unknown User'}</div>
+                            <div className="text-xs text-muted-foreground">{log.userId?.email || 'No email'}</div>
                           </div>
+                        </td>
+                        <td className="p-2 text-sm text-foreground">
+                          {log.action === 'DELETE' ? (log.officerName || 'N/A') : 'N/A'}
+                        </td>
+                        <td className="p-2 text-sm text-foreground">
+                          {log.billInfo?.billNumber || 'N/A'}
                         </td>
                         <td className="p-2 text-sm text-foreground max-w-xs truncate" title={log.reason}>
                           {log.reason}

@@ -159,12 +159,27 @@ After running the seed script, you can login with:
 
 **Important**: Change the default admin password after first login.
 
+## Application URLs
+
+### Frontend Routes
+- `/` - Landing page
+- `/login` - User login
+- `/dashboard` - Department dashboard
+- `/add-material` - Asset type selection
+- `/capital` - Capital asset form
+- `/revenue` - Revenue asset form
+- `/reports` - Reports and analytics
+- `/admin` - Admin dashboard
+- `/admin/password-reset` - Admin password reset
+- `/admin/management` - Admin user management
+
 ## API Endpoints
 
 ### Authentication
 - `POST /api/auth/login` - User login
 - `POST /api/auth/register` - User registration
 - `GET /api/auth/me` - Get current user
+- `PUT /api/auth/change-password` - Change user password
 
 ### Assets
 - `GET /api/assets` - Get all assets
@@ -189,6 +204,25 @@ After running the seed script, you can login with:
 - `POST /api/departments` - Create department
 - `PUT /api/departments/:id` - Update department
 - `DELETE /api/departments/:id` - Delete department
+
+### Admin Management
+- `GET /api/admin/users` - Get admin users
+- `POST /api/admin/users` - Create admin user
+- `PUT /api/admin/users/:id` - Update admin user
+- `DELETE /api/admin/users/:id` - Delete admin user
+- `GET /api/admin/database-stats` - Get database statistics
+- `GET /api/admin/audit-logs` - Get audit logs
+
+### Notifications
+- `GET /api/notifications` - Get user notifications
+- `PUT /api/notifications/:id/read` - Mark notification as read
+- `PUT /api/notifications/mark-all-read` - Mark all notifications as read
+
+### Update Requests
+- `GET /api/assets/pending-updates` - Get pending update requests
+- `POST /api/assets/:id/request-update` - Request asset update
+- `POST /api/assets/:id/approve-update` - Approve update request
+- `POST /api/assets/:id/reject-update` - Reject update request
 
 ## User Roles
 

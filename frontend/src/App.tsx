@@ -20,8 +20,12 @@ import CapitalForm from "./pages/CapitalForm";
 import RevenueForm from "./pages/RevenueForm";
 import Reports from "./pages/Reports";
 import AdminDashboard from "./pages/AdminDashboard";
-import NotFound from "./pages/NotFound";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
+import AdminPasswordReset from "./pages/AdminPasswordReset";
+import AdminManagement from "./pages/AdminManagement";
+import ProfileSetup from "./pages/ProfileSetup";
+import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -73,6 +77,26 @@ const App = () => (
                         <AdminProtectedRoute>
                           <AdminDashboard />
                         </AdminProtectedRoute>
+                      } />
+                      <Route path="/admin-dashboard" element={
+                        <AdminProtectedRoute>
+                          <AdminDashboard />
+                        </AdminProtectedRoute>
+                      } />
+                      <Route path="/admin/password-reset" element={
+                        <AdminProtectedRoute>
+                          <AdminPasswordReset />
+                        </AdminProtectedRoute>
+                      } />
+                      <Route path="/admin/management" element={
+                        <AdminProtectedRoute>
+                          <AdminManagement />
+                        </AdminProtectedRoute>
+                      } />
+                      <Route path="/profile-setup" element={
+                        <ProtectedRoute>
+                          <ProfileSetup />
+                        </ProtectedRoute>
                       } />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />

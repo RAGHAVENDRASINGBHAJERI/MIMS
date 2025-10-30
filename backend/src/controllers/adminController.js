@@ -61,7 +61,9 @@ export const getDatabaseStats = async (req, res, next) => {
       .sort({ timestamp: -1 })
       .limit(10);
 
-    const pendingPasswordResets = await PasswordResetRequest.find({ status: 'PENDING' })
+    const pendingPasswordResets = await PasswordResetRequest.find({ 
+      status: { $in: ['PENDING', 'pending'] }
+    })
       .populate('userId', 'name email role')
       .sort({ createdAt: -1 });
 
@@ -162,7 +164,7 @@ export const approvePasswordReset = async (req, res, next) => {
       });
     }
 
-    if (request.status !== 'PENDING') {
+    if (!['PENDING', 'pending'].includes(request.status)) {
       return res.status(400).json({
         success: false,
         error: 'Request already processed'
@@ -208,7 +210,7 @@ export const rejectPasswordReset = async (req, res, next) => {
       });
     }
 
-    if (request.status !== 'PENDING') {
+    if (!['PENDING', 'pending'].includes(request.status)) {
       return res.status(400).json({
         success: false,
         error: 'Request already processed'
@@ -312,6 +314,19 @@ export const deleteAnnouncement = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Announcement deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearAuditLogs = async (req, res, next) => {
+  try {
+    await AuditLog.deleteMany({});
+    
+    res.json({
+      success: true,
+      message: 'All audit logs cleared successfully'
     });
   } catch (error) {
     next(error);

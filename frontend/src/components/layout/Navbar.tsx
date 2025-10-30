@@ -1,4 +1,4 @@
-import { Menu, Bell, User, Search, LogOut, X } from 'lucide-react';
+import { Menu, Bell, User, Search, LogOut, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAssetFlow } from '@/context/AssetFlowContext';
@@ -166,7 +166,7 @@ export function Navbar() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-3 py-2 rounded-lg hover:bg-slate-600 transition-all duration-300 font-medium text-sm"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/dashboard')}
               >
                 Dashboard
               </motion.button>
@@ -208,6 +208,10 @@ export function Navbar() {
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/profile-setup')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Profile Settings</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
@@ -276,7 +280,7 @@ export function Navbar() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full text-left px-4 py-4 text-white hover:bg-slate-700 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-3"
-                  onClick={() => handleNavigation('/dashboard')}
+                  onClick={() => handleNavigation(user?.role === 'admin' ? '/admin' : '/dashboard')}
                 >
                   <span>📊</span> Dashboard
                 </motion.button>

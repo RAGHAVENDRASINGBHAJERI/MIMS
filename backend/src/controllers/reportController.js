@@ -396,7 +396,9 @@ export const getYearReport = async (req, res, next) => {
 
 export const exportExcel = async (req, res, next) => {
   try {
-    const { type, departmentId, vendorName, itemName, type: assetType, startDate, endDate } = req.query;
+    const { type, departmentId, vendorName, itemName, startDate, endDate } = req.query;
+    // Handle multiple type parameters - second one is asset type
+    const assetType = Array.isArray(req.query.type) ? req.query.type[1] : (req.query.type !== 'combined' && req.query.type !== 'department' && req.query.type !== 'vendor' && req.query.type !== 'item' && req.query.type !== 'year' ? req.query.type : null);
     const user = req.user;
     let report = [];
     let summary = null;
@@ -458,6 +460,9 @@ export const exportExcel = async (req, res, next) => {
         { 'items.particulars': { $regex: new RegExp(itemName, 'i') } }
       ];
     }
+    
+    // Store the actual asset type used for filtering
+    const actualAssetType = assetType && assetType !== 'undefined' ? assetType : null;
 
     // Get all assets for all report types
     report = await Asset.find(filterQuery)
@@ -491,40 +496,119 @@ export const exportExcel = async (req, res, next) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Report');
 
-    // Add report header information
-    const reportTypeTitle = reportType.charAt(0).toUpperCase() + reportType.slice(1) + ' Report';
+    // Get department name from existing report data
+    let departmentName = 'All Departments';
+    if (departmentId && departmentId !== 'all' && departmentId !== 'undefined' && report.length > 0 && report[0].department?.name) {
+      departmentName = report[0].department.name;
+    }
+    
+    const assetTypeText = actualAssetType && typeof actualAssetType === 'string' ? ` - ${actualAssetType.charAt(0).toUpperCase() + actualAssetType.slice(1)} Assets` : ' - All Types';
+    const reportTypeTitle = `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${departmentName}${assetTypeText}`;
 
     // Add title row
-
     worksheet.addRow([reportTypeTitle]);
     worksheet.addRow([]); // Empty row
 
-    // Style the header row
-    worksheet.getRow(1).font = { bold: true, size: 10};
+    // Style and merge the title row
+    const titleRow = worksheet.getRow(1);
+    titleRow.font = { bold: true, size: 14 };
+    titleRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleRow.height = 30;
+    worksheet.mergeCells('A1:O1'); // Merge from A to O (Remarks column)
+    
+
    
 
-    // Add column headers
+    // Define columns without headers first
     worksheet.columns = [
-      { header: 'Sl No.', key: 'slNo' },
-      { header: 'College ISR No.', key: 'collegeISRNo' },
-      { header: 'IT ISR No.', key: 'itISRNo' },
-      { header: 'Particulars', key: 'particulars' },
-      { header: 'Vendor', key: 'vendor' },
-      { header: 'Bill Date', key: 'billDate' },
-      { header: 'Bill No.', key: 'billNo' },
-      { header: 'Quantity', key: 'quantity' },
-      { header: 'Rate', key: 'rate' },
-      { header: 'Amount', key: 'amount' },
-      { header: 'CGST%', key: 'cgst' },
-      { header: 'SGST%', key: 'sgst' },
-      { header: 'Grand Total', key: 'grandTotal' },
-      { header: 'Remark', key: 'remark' }
+      { key: 'slNo', width: 10 },
+      { key: 'collegeISRNo', width: 18 },
+      { key: 'itISRNo', width: 18 },
+      { key: 'particulars', width: 35 },
+      { key: 'serialNumbers', width: 25 },
+      { key: 'vendor', width: 25 },
+      { key: 'billDate', width: 15 },
+      { key: 'billNo', width: 18 },
+      { key: 'quantity', width: 12 },
+      { key: 'rate', width: 15 },
+      { key: 'amount', width: 15 },
+      { key: 'cgst', width: 10 },
+      { key: 'sgst', width: 10 },
+      { key: 'grandTotal', width: 18 },
+      { key: 'remark', width: 25 }
     ];
+
+    // Define border style
+    const borderStyle = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+
+    // Add column headers manually in row 3
+    const headerRow = worksheet.getRow(3);
+    headerRow.values = ['Sl No.', 'College ISR No.', 'IT ISR No.', 'Particulars', 'Serial Numbers', 'Vendor', 'Bill Date', 'Bill No.', 'Quantity', 'Rate', 'Amount', 'CGST%', 'SGST%', 'Grand Total', 'Remark'];
+    headerRow.font = { bold: true, size: 12 };
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    // Apply gray background only to columns up to Remarks (A-O)
+    for (let col = 1; col <= 15; col++) {
+      const cell = headerRow.getCell(col);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+    }
+    headerRow.height = 25;
+    headerRow.eachCell((cell) => {
+      cell.border = borderStyle;
+    });
 
     // Map report data to flat objects for Excel rows
     let rows = [];
     let slNoCounter = 1;
     
+    // Helper function to create rows for an item with serial numbers
+    const createRowsForItem = (asset, sub, isLegacy = false) => {
+      const baseRow = {
+        collegeISRNo: asset.collegeISRNo || '',
+        itISRNo: asset.itISRNo || '',
+        particulars: isLegacy ? asset.itemName || '' : sub.particulars || '',
+        vendor: asset.vendorName || asset.vendor || '',
+        billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+        billNo: asset.billNo || '',
+        quantity: isLegacy ? asset.quantity || 0 : sub.quantity || 0,
+        rate: isLegacy ? asset.pricePerItem || 0 : sub.rate || 0,
+        amount: isLegacy ? asset.totalAmount || 0 : sub.amount || 0,
+        cgst: isLegacy ? asset.cgst || 0 : sub.cgst || 0,
+        sgst: isLegacy ? asset.sgst || 0 : sub.sgst || 0,
+        grandTotal: isLegacy ? asset.grandTotal || asset.totalAmount || 0 : sub.grandTotal || 0,
+        remark: asset.remark || ''
+      };
+
+      // Get serial numbers
+      const serialNumbers = isLegacy ? [] : (sub.serialNumbers && sub.serialNumbers.length > 0 ? sub.serialNumbers.filter(s => s.trim()) : (sub.serialNumber ? sub.serialNumber.split('\n').filter(s => s.trim()) : []));
+
+      if (serialNumbers.length > 0) {
+        // Create one row per serial number
+        serialNumbers.forEach(serial => {
+          rows.push({
+            slNo: slNoCounter++,
+            ...baseRow,
+            serialNumbers: serial
+          });
+        });
+      } else {
+        // No serial numbers, create one row
+        rows.push({
+          slNo: slNoCounter++,
+          ...baseRow,
+          serialNumbers: ''
+        });
+      }
+    };
+
     // For item report type, flatten individual items
     if (reportType === 'item') {
       report.forEach(asset => {
@@ -532,43 +616,13 @@ export const exportExcel = async (req, res, next) => {
           asset.items.forEach(sub => {
             // Filter items by name if specified
             if (!itemName || sub.particulars?.toLowerCase().includes(itemName.toLowerCase())) {
-              rows.push({
-                slNo: slNoCounter++,
-                collegeISRNo: asset.collegeISRNo || '',
-                itISRNo: asset.itISRNo || '',
-                particulars: sub.particulars || '',
-                vendor: asset.vendorName || asset.vendor || '',
-                billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-                billNo: asset.billNo || '',
-                quantity: sub.quantity || 0,
-                rate: sub.rate || 0,
-                amount: sub.amount || 0,
-                cgst: sub.cgst || 0,
-                sgst: sub.sgst || 0,
-                grandTotal: sub.grandTotal || 0,
-                remark: asset.remark || ''
-              });
+              createRowsForItem(asset, sub);
             }
           });
         } else {
           // Legacy single item
           if (!itemName || asset.itemName?.toLowerCase().includes(itemName.toLowerCase())) {
-            rows.push({
-              slNo: slNoCounter++,
-              collegeISRNo: asset.collegeISRNo || '',
-              itISRNo: asset.itISRNo || '',
-              particulars: asset.itemName || '',
-              vendor: asset.vendorName || asset.vendor || '',
-              billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-              billNo: asset.billNo || '',
-              quantity: asset.quantity || 0,
-              rate: asset.pricePerItem || 0,
-              amount: asset.totalAmount || 0,
-              cgst: asset.cgst || 0,
-              sgst: asset.sgst || 0,
-              grandTotal: asset.grandTotal || asset.totalAmount || 0,
-              remark: asset.remark || ''
-            });
+            createRowsForItem(asset, asset, true);
           }
         }
       });
@@ -577,40 +631,10 @@ export const exportExcel = async (req, res, next) => {
       report.forEach(item => {
         if (Array.isArray(item.items) && item.items.length > 0) {
           item.items.forEach(sub => {
-            rows.push({
-              slNo: slNoCounter++,
-              collegeISRNo: item.collegeISRNo || '',
-              itISRNo: item.itISRNo || '',
-              particulars: sub.particulars || '',
-              vendor: item.vendorName || item.vendor || '',
-              billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-              billNo: item.billNo || '',
-              quantity: sub.quantity || 0,
-              rate: sub.rate || 0,
-              amount: sub.amount || 0,
-              cgst: sub.cgst || 0,
-              sgst: sub.sgst || 0,
-              grandTotal: sub.grandTotal || 0,
-              remark: item.remark || ''
-            });
+            createRowsForItem(item, sub);
           });
         } else {
-          rows.push({
-            slNo: slNoCounter++,
-            collegeISRNo: item.collegeISRNo || '',
-            itISRNo: item.itISRNo || '',
-            particulars: item.itemName || '',
-            vendor: item.vendorName || item.vendor || '',
-            billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-            billNo: item.billNo || '',
-            quantity: item.quantity || 0,
-            rate: item.pricePerItem || 0,
-            amount: item.totalAmount || 0,
-            cgst: item.cgst || 0,
-            sgst: item.sgst || 0,
-            grandTotal: item.grandTotal || item.totalAmount || 0,
-            remark: item.remark || ''
-          });
+          createRowsForItem(item, item, true);
         }
       });
     }
@@ -622,6 +646,7 @@ export const exportExcel = async (req, res, next) => {
         collegeISRNo: '',
         itISRNo: '',
         particulars: 'No data found for the selected filters',
+        serialNumbers: '',
         vendor: '',
         billDate: '',
         billNo: '',
@@ -635,9 +660,59 @@ export const exportExcel = async (req, res, next) => {
       });
     }
 
-    // Add data rows starting from row 6 (after headers)
+    // Add data rows starting from row 4 (immediately after headers)
+    const startRow = 4;
     rows.forEach(row => {
       worksheet.addRow(row);
+    });
+    const endRow = worksheet.rowCount;
+
+
+
+
+
+    // Apply borders and center alignment to data rows
+    for (let rowNum = startRow; rowNum <= endRow; rowNum++) {
+      const row = worksheet.getRow(rowNum);
+      row.eachCell((cell) => {
+        cell.border = borderStyle;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      row.height = 20; // Set row height
+    }
+
+    // Merge cells for consecutive rows with same values
+    const columnsToMerge = ['collegeISRNo', 'itISRNo', 'particulars', 'vendor', 'billDate', 'billNo', 'quantity', 'rate', 'amount', 'cgst', 'sgst', 'grandTotal', 'remark'];
+    
+    columnsToMerge.forEach(columnKey => {
+      const columnIndex = worksheet.columns.findIndex(col => col.key === columnKey) + 1;
+      if (columnIndex === 0) return;
+      
+      let mergeStart = startRow;
+      let currentValue = rows[0] ? rows[0][columnKey] : null;
+      
+      for (let i = 1; i <= rows.length; i++) {
+        const nextValue = i < rows.length ? rows[i][columnKey] : null;
+        
+        if (nextValue !== currentValue || i === rows.length) {
+          const mergeEnd = startRow + i - 1;
+          
+          if (mergeEnd > mergeStart) {
+            // Merge cells
+            worksheet.mergeCells(mergeStart, columnIndex, mergeEnd, columnIndex);
+            
+            // Center align merged cells
+            const mergedCell = worksheet.getCell(mergeStart, columnIndex);
+            mergedCell.alignment = { 
+              vertical: 'middle', 
+              horizontal: 'center' 
+            };
+          }
+          
+          mergeStart = startRow + i;
+          currentValue = nextValue;
+        }
+      }
     });
 
     // Add total row at the end
@@ -647,11 +722,12 @@ export const exportExcel = async (req, res, next) => {
       const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
 
       worksheet.addRow({}); // Empty row for separation
-      worksheet.addRow({
+      const totalRow = worksheet.addRow({
         slNo: '',
         collegeISRNo: '',
         itISRNo: '',
         particulars: 'TOTAL',
+        serialNumbers: '',
         vendor: '',
         billDate: '',
         billNo: '',
@@ -663,11 +739,32 @@ export const exportExcel = async (req, res, next) => {
         grandTotal: totalGrandTotal,
         remark: ''
       });
+      
+      // Apply borders, center alignment, and styling to total row
+      totalRow.eachCell((cell) => {
+        cell.border = borderStyle;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      totalRow.height = 25;
     }
 
-    // Auto-fit column widths
-    worksheet.columns.forEach(column => {
-      column.width = undefined;
+    // Auto-fit column widths based on content
+    worksheet.columns.forEach((column, index) => {
+      let maxLength = 0;
+      const columnLetter = String.fromCharCode(65 + index);
+      
+      worksheet.eachRow((row, rowNumber) => {
+        const cell = row.getCell(index + 1);
+        if (cell.value) {
+          const cellLength = cell.value.toString().length;
+          if (cellLength > maxLength) {
+            maxLength = cellLength;
+          }
+        }
+      });
+      
+      column.width = Math.max(maxLength + 2, column.width || 10);
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

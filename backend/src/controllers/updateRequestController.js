@@ -6,10 +6,13 @@ const getFieldDisplayValue = (field, value, asset) => {
   if (field === 'items' && Array.isArray(value)) {
     return value.map(item => `${item.particulars} (Qty: ${item.quantity}, Rate: ₹${item.rate})`).join(', ');
   }
-  if (field === 'singleItem' && value) {
-    const { itemIndex, updatedItem, action } = value;
-    if (action === 'delete') return `Delete item at index ${itemIndex}`;
+  if (field === 'items' && value && value.itemIndex !== undefined) {
+    const { itemIndex, updatedItem } = value;
     return `${updatedItem.particulars} (Qty: ${updatedItem.quantity}, Rate: ₹${updatedItem.rate})`;
+  }
+  if (field === 'deleteItem' && value) {
+    const { itemIndex } = value;
+    return `Delete item at index ${itemIndex}`;
   }
   if (field === 'billDate') return new Date(value).toLocaleDateString();
   return String(value || '');
@@ -53,7 +56,14 @@ export const getPendingUpdates = async (req, res, next) => {
       const newValues = {};
       
       asset.requestedFields.forEach(field => {
-        currentValues[field] = getFieldDisplayValue(field, asset[field], asset);
+        if (field === 'items' && asset.tempValues[field] && asset.tempValues[field].itemIndex !== undefined) {
+          // Single item update
+          const { itemIndex } = asset.tempValues[field];
+          currentValues[field] = asset.items[itemIndex] ? 
+            `${asset.items[itemIndex].particulars} (Qty: ${asset.items[itemIndex].quantity}, Rate: ₹${asset.items[itemIndex].rate})` : 'Item not found';
+        } else {
+          currentValues[field] = getFieldDisplayValue(field, asset[field], asset);
+        }
         newValues[field] = getFieldDisplayValue(field, asset.tempValues[field], asset);
       });
       
@@ -83,7 +93,7 @@ export const approveAssetUpdate = async (req, res, next) => {
     // Apply the temp values to actual fields
     Object.keys(asset.tempValues).forEach(field => {
       if (field === 'items' && Array.isArray(asset.tempValues[field])) {
-        // Recalculate item totals
+        // Handle full items array update
         asset.items = asset.tempValues[field].map(item => {
           const quantity = Number(item.quantity) || 0;
           const rate = Number(item.rate) || 0;
@@ -97,6 +107,7 @@ export const approveAssetUpdate = async (req, res, next) => {
           
           return {
             ...item,
+            serialNumber: item.serialNumber || '',
             quantity,
             rate,
             cgst,
@@ -108,15 +119,23 @@ export const approveAssetUpdate = async (req, res, next) => {
         // Recalculate asset totals
         asset.totalAmount = asset.items.reduce((sum, item) => sum + item.amount, 0);
         asset.grandTotal = asset.items.reduce((sum, item) => sum + item.grandTotal, 0);
-      } else if (field === 'singleItem') {
-        // Handle single item update or delete
-        const { itemIndex, updatedItem, action } = asset.tempValues[field];
+      } else if (field === 'deleteItem') {
+        // Handle item deletion
+        const { itemIndex } = asset.tempValues[field];
         if (asset.items && itemIndex >= 0 && itemIndex < asset.items.length) {
-          if (action === 'delete') {
-            asset.items.splice(itemIndex, 1);
-          } else if (action === 'update') {
-            asset.items[itemIndex] = updatedItem;
-          }
+          asset.items.splice(itemIndex, 1);
+          // Recalculate totals
+          asset.totalAmount = asset.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+          asset.grandTotal = asset.items.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
+        }
+      } else if (field === 'items' && asset.tempValues[field].itemIndex !== undefined) {
+        // Handle single item update
+        const { itemIndex, updatedItem } = asset.tempValues[field];
+        if (asset.items && itemIndex >= 0 && itemIndex < asset.items.length) {
+          asset.items[itemIndex] = {
+            ...updatedItem,
+            serialNumber: updatedItem.serialNumber || ''
+          };
           // Recalculate totals
           asset.totalAmount = asset.items.reduce((sum, item) => sum + (item.amount || 0), 0);
           asset.grandTotal = asset.items.reduce((sum, item) => sum + (item.grandTotal || 0), 0);
