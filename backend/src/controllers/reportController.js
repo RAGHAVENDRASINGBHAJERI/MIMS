@@ -1232,15 +1232,24 @@ export const exportMergedBillsPDF = async (req, res, next) => {
       });
     }
 
-    // Create a new PDF document
-    const doc = new PDFDocument({ margin: 50 });
-    
-    // Set response headers
+    // Set response headers first
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="merged_bills_${new Date().toISOString().split('T')[0]}.pdf"`);
     
+    // Create a new PDF document
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    
     // Pipe the PDF to response
     doc.pipe(res);
+    
+    // Handle PDF errors
+    doc.on('error', (err) => {
+      console.error('PDF generation error:', err);
+    });
+    
+    res.on('error', (err) => {
+      console.error('Response stream error:', err);
+    });
 
     // Add title page
     doc.fontSize(20).text('Asset Bills Report', { align: 'center' });
@@ -1264,82 +1273,150 @@ export const exportMergedBillsPDF = async (req, res, next) => {
     doc.fontSize(14).text('Asset Details:', { underline: true });
     doc.moveDown();
 
+    let currentY = doc.y;
+    
     assets.forEach((asset, index) => {
       // Add page break for each asset (except first)
       if (index > 0) {
         doc.addPage();
+        currentY = 50; // Reset Y position for new page
       }
 
       doc.fontSize(12)
-        .text(`${index + 1}. Bill #${asset.billNo || 'N/A'}`, { underline: true })
-        .text(`Date: ${asset.billDate ? new Date(asset.billDate).toLocaleDateString() : 'N/A'}`)
-        .text(`Department: ${asset.department?.name || 'N/A'}`)
-        .text(`Type: ${asset.type || 'N/A'}`)
-        .text(`Vendor: ${asset.vendorName || 'N/A'}`)
-        .text(`Contact: ${asset.contactNumber || 'N/A'}`)
-        .text(`Email: ${asset.email || 'N/A'}`)
-        .moveDown();
+        .text(`${index + 1}. Bill #${asset.billNo || 'N/A'}`, 50, currentY, { underline: true });
+      currentY += 20;
+      
+      doc.fontSize(10)
+        .text(`Date: ${asset.billDate ? new Date(asset.billDate).toLocaleDateString() : 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Department: ${asset.department?.name || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Type: ${asset.type || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Vendor: ${asset.vendorName || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Contact: ${asset.contactNumber || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Email: ${asset.email || 'N/A'}`, 50, currentY);
+      currentY += 20;
 
       // Add items table if available
       if (asset.items && asset.items.length > 0) {
-        doc.text('Items:', { underline: true });
-        
-        // Table headers
-        const startX = 50;
-        let currentY = doc.y;
-        
-        doc.text('Particulars', startX, currentY, { width: 120 })
-           .text('Qty', startX + 120, currentY, { width: 40 })
-           .text('Rate', startX + 160, currentY, { width: 60 })
-           .text('CGST%', startX + 220, currentY, { width: 50 })
-           .text('SGST%', startX + 270, currentY, { width: 50 })
-           .text('Total', startX + 320, currentY, { width: 80 });
-        
+        doc.fontSize(11).text('Items:', 50, currentY, { underline: true });
         currentY += 20;
         
+        // Table headers with proper spacing
+        const startX = 50;
+        
+        doc.fontSize(9)
+           .text('Sl.No', 50, currentY)
+           .text('Particulars', 85, currentY)
+           .text('Serial No', 210, currentY)
+           .text('Qty', 340, currentY)
+           .text('Rate', 370, currentY)
+           .text('CGST%', 430, currentY)
+           .text('SGST%', 470, currentY)
+           .text('Total', 510, currentY);
+        
+        currentY += 15;
+        
         // Draw line under headers
-        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        doc.moveTo(50, currentY).lineTo(570, currentY).stroke();
         currentY += 10;
         
-        // Add items
+        // Add items with serial numbers
+        let serialCounter = 1;
         asset.items.forEach(item => {
-          doc.text(item.particulars || '', startX, currentY, { width: 120 })
-             .text((item.quantity || 0).toString(), startX + 120, currentY, { width: 40 })
-             .text(`₹${(item.rate || 0).toLocaleString()}`, startX + 160, currentY, { width: 60 })
-             .text(`${item.cgst || 0}%`, startX + 220, currentY, { width: 50 })
-             .text(`${item.sgst || 0}%`, startX + 270, currentY, { width: 50 })
-             .text(`₹${(item.grandTotal || 0).toLocaleString()}`, startX + 320, currentY, { width: 80 });
-          currentY += 15;
+          const serialNumbers = item.serialNumbers && item.serialNumbers.length > 0 
+            ? item.serialNumbers.filter(s => s.trim()) 
+            : (item.serialNumber ? item.serialNumber.split('\n').filter(s => s.trim()) : []);
+          
+          if (serialNumbers.length > 0) {
+            // Create one row per serial number
+            serialNumbers.forEach(serial => {
+              doc.fontSize(8)
+                 .text(serialCounter.toString(), 50, currentY)
+                 .text(item.particulars || '', 85, currentY, { width: 120, height: 30 })
+                 .text(serial, 210, currentY, { width: 125, height: 30 })
+                 .text((item.quantity || 0).toString(), 340, currentY)
+                 .text(`₹${(item.rate || 0).toLocaleString()}`, 370, currentY, { width: 55 })
+                 .text(`${item.cgst || 0}%`, 430, currentY)
+                 .text(`${item.sgst || 0}%`, 470, currentY)
+                 .text(`₹${(item.grandTotal || 0).toLocaleString()}`, 510, currentY, { width: 60 });
+              currentY += 30;
+              serialCounter++;
+            });
+          } else {
+            // No serial numbers, create one row
+            doc.fontSize(8)
+               .text(serialCounter.toString(), 50, currentY)
+               .text(item.particulars || '', 85, currentY, { width: 120, height: 30 })
+               .text('N/A', 210, currentY)
+               .text((item.quantity || 0).toString(), 340, currentY)
+               .text(`₹${(item.rate || 0).toLocaleString()}`, 370, currentY, { width: 55 })
+               .text(`${item.cgst || 0}%`, 430, currentY)
+               .text(`${item.sgst || 0}%`, 470, currentY)
+               .text(`₹${(item.grandTotal || 0).toLocaleString()}`, 510, currentY, { width: 60 });
+            currentY += 30;
+            serialCounter++;
+          }
         });
         
         // Total line
-        currentY += 10;
-        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        currentY += 5;
+        doc.moveTo(50, currentY).lineTo(570, currentY).stroke();
         currentY += 10;
         
         const assetTotal = asset.grandTotal || asset.totalAmount || 0;
-        doc.fontSize(12).text(`Asset Total: ₹${assetTotal.toLocaleString()}`, startX + 250, currentY, { width: 150 });
+        doc.fontSize(10).text(`Asset Total: ₹${assetTotal.toLocaleString()}`, 410, currentY);
+        currentY += 20;
       } else {
         // Legacy single item display
-        doc.text(`Item: ${asset.itemName || 'N/A'}`)
-           .text(`Quantity: ${asset.quantity || 'N/A'}`)
-           .text(`Price per Item: ₹${(asset.pricePerItem || 0).toLocaleString()}`)
-           .text(`Total Amount: ₹${(asset.totalAmount || 0).toLocaleString()}`);
+        doc.fontSize(10)
+           .text(`Item: ${asset.itemName || 'N/A'}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Quantity: ${asset.quantity || 'N/A'}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Price per Item: ₹${(asset.pricePerItem || 0).toLocaleString()}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Total Amount: ₹${(asset.totalAmount || 0).toLocaleString()}`, 50, currentY);
+        currentY += 15;
       }
       
       if (asset.remark) {
-        doc.moveDown().text(`Remark: ${asset.remark}`);
+        currentY += 15;
+        doc.fontSize(9)
+           .text('Remark:', 50, currentY, { width: 60 })
+           .text(asset.remark, 115, currentY, { width: 450, align: 'left' });
+        currentY += 20;
       }
       
-      doc.moveDown(2);
+      // Ensure we don't exceed page boundaries
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 50;
+      }
+      currentY += 10;
     });
 
     // Finalize the PDF
     doc.end();
 
   } catch (error) {
+    console.error('Merged PDF export error:', error);
     if (!res.headersSent) {
-      next(error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate merged PDF'
+      });
     }
   }
 };
