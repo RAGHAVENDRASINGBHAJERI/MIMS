@@ -35,6 +35,7 @@ MIMS provides a modern, scalable solution built using cutting-edge web technolog
 
 The system follows modern software architecture principles:
 - **MVC Pattern** for clear separation of concerns
+
 - **RESTful API** design for scalable backend services
 - **Component-based architecture** for maintainable frontend
 - **Indian currency formatting** (thousands, lakhs, crores) for localized experience

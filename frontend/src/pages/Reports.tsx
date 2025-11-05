@@ -417,7 +417,7 @@ export default function Reports() {
     return (
       <div className="mt-4 p-4 bg-gray-50 rounded-lg">
         <h4 className="text-sm font-medium text-gray-700 mb-3">Items Details</h4>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
