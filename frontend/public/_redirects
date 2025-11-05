@@ -1,1 +1,5 @@
+# API proxy (optional)
+/api/*  https://mims-1.onrender.com/api/:splat  200
+
+# SPA routing - all other routes go to index.html
 /*    /index.html   200

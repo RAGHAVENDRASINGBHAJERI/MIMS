@@ -2,10 +2,18 @@
   publish = "dist"
   command = "npm run build"
 
+# API redirects (if needed for proxy)
+[[redirects]]
+  from = "/api/*"
+  to = "https://mims-1.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA routing - catch all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
