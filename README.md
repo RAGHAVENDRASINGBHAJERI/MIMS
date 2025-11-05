@@ -234,6 +234,24 @@ assetflow-stream/
 
 This project is licensed under the MIT License.
 
+## References
+
+1. **Ameri, F., & Dutta, D.** (2005). "Product lifecycle management: closing the knowledge loops." *Computer-Aided Design and Applications*, 2(5), 577-590.
+
+2. **Sandkuhl, K., & Lehmann, H.** (2017). "Digital Enterprise Architecture–Transformation for the Digital World." In *Enterprise, Business-Process and Information Systems Modeling* (pp. 3-17). Springer.
+
+3. **Xu, L. D., Xu, E. L., & Li, L.** (2018). "Industry 4.0: state of the art and future trends." *International Journal of Production Research*, 56(8), 2941-2962.
+
+4. **Ferretti, I., Zanoni, S., Zavanella, L., & Diana, A.** (2007). "Greening the aluminum supply chain." *International Journal of Production Economics*, 108(1-2), 236-245.
+
+5. **Kiritsis, D.** (2011). "Closed-loop PLM for intelligent products in the era of the Internet of things." *Computer-Aided Design*, 43(5), 479-501.
+
+6. **Sandborn, P.** (2007). "Software obsolescence–Complicating the part and technology obsolescence management problem." *IEEE Transactions on Components and Packaging Technologies*, 30(4), 886-888.
+
+7. **Jun, H. B., Kiritsis, D., & Xirouchakis, P.** (2007). "Research issues on closed-loop PLM." *Computers in Industry*, 58(8-9), 855-868.
+
+8. **Terzi, S., Bouras, A., Dutta, D., Garetti, M., & Kiritsis, D.** (2010). "Product lifecycle management–from its history to its new role." *International Journal of Product Lifecycle Management*, 4(4), 360-389.
+
 ## Support
 
 For support and questions, please contact the development team.

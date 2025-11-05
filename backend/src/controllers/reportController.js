@@ -640,14 +640,13 @@ export const exportExcel = async (req, res, next) => {
       worksheet.addRow(row);
     });
 
-    // Add total row at the end
+    // Add total row at the end with Excel formulas
     if (rows.length > 0) {
-      const totalAmount = rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-      const totalGrandTotal = rows.reduce((sum, row) => sum + (Number(row.grandTotal) || 0), 0);
-      const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
-
+      const dataStartRow = 4; // Headers are on row 3, data starts on row 4
+      const dataEndRow = dataStartRow + rows.length - 1;
+      
       worksheet.addRow({}); // Empty row for separation
-      worksheet.addRow({
+      const totalRow = worksheet.addRow({
         slNo: '',
         collegeISRNo: '',
         itISRNo: '',
@@ -655,14 +654,17 @@ export const exportExcel = async (req, res, next) => {
         vendor: '',
         billDate: '',
         billNo: '',
-        quantity: totalQuantity,
+        quantity: { formula: `SUM(H${dataStartRow}:H${dataEndRow})` },
         rate: '',
-        amount: totalAmount,
+        amount: { formula: `SUM(J${dataStartRow}:J${dataEndRow})` },
         cgst: '',
         sgst: '',
-        grandTotal: totalGrandTotal,
+        grandTotal: { formula: `SUM(M${dataStartRow}:M${dataEndRow})` },
         remark: ''
       });
+      
+      // Make total row bold
+      totalRow.font = { bold: true };
     }
 
     // Auto-fit column widths
