@@ -27,6 +27,10 @@ const auditLogSchema = new mongoose.Schema({
   officerName: {
     type: String
   },
+  billInfo: {
+    billNumber: String,
+    vendorName: String
+  },
   oldData: {
     type: mongoose.Schema.Types.Mixed
   },

@@ -396,7 +396,9 @@ export const getYearReport = async (req, res, next) => {
 
 export const exportExcel = async (req, res, next) => {
   try {
-    const { type, departmentId, vendorName, itemName, type: assetType, startDate, endDate } = req.query;
+    const { type, departmentId, vendorName, itemName, startDate, endDate } = req.query;
+    // Handle multiple type parameters - second one is asset type
+    const assetType = Array.isArray(req.query.type) ? req.query.type[1] : (req.query.type !== 'combined' && req.query.type !== 'department' && req.query.type !== 'vendor' && req.query.type !== 'item' && req.query.type !== 'year' ? req.query.type : null);
     const user = req.user;
     let report = [];
     let summary = null;
@@ -458,6 +460,9 @@ export const exportExcel = async (req, res, next) => {
         { 'items.particulars': { $regex: new RegExp(itemName, 'i') } }
       ];
     }
+    
+    // Store the actual asset type used for filtering
+    const actualAssetType = assetType && assetType !== 'undefined' ? assetType : null;
 
     // Get all assets for all report types
     report = await Asset.find(filterQuery)
@@ -491,40 +496,119 @@ export const exportExcel = async (req, res, next) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Report');
 
-    // Add report header information
-    const reportTypeTitle = reportType.charAt(0).toUpperCase() + reportType.slice(1) + ' Report';
+    // Get department name from existing report data
+    let departmentName = 'All Departments';
+    if (departmentId && departmentId !== 'all' && departmentId !== 'undefined' && report.length > 0 && report[0].department?.name) {
+      departmentName = report[0].department.name;
+    }
+    
+    const assetTypeText = actualAssetType && typeof actualAssetType === 'string' ? ` - ${actualAssetType.charAt(0).toUpperCase() + actualAssetType.slice(1)} Assets` : ' - All Types';
+    const reportTypeTitle = `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${departmentName}${assetTypeText}`;
 
     // Add title row
-
     worksheet.addRow([reportTypeTitle]);
     worksheet.addRow([]); // Empty row
 
-    // Style the header row
-    worksheet.getRow(1).font = { bold: true, size: 10};
+    // Style and merge the title row
+    const titleRow = worksheet.getRow(1);
+    titleRow.font = { bold: true, size: 14 };
+    titleRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleRow.height = 30;
+    worksheet.mergeCells('A1:O1'); // Merge from A to O (Remarks column)
+    
+
    
 
-    // Add column headers
+    // Define columns without headers first
     worksheet.columns = [
-      { header: 'Sl No.', key: 'slNo' },
-      { header: 'College ISR No.', key: 'collegeISRNo' },
-      { header: 'IT ISR No.', key: 'itISRNo' },
-      { header: 'Particulars', key: 'particulars' },
-      { header: 'Vendor', key: 'vendor' },
-      { header: 'Bill Date', key: 'billDate' },
-      { header: 'Bill No.', key: 'billNo' },
-      { header: 'Quantity', key: 'quantity' },
-      { header: 'Rate', key: 'rate' },
-      { header: 'Amount', key: 'amount' },
-      { header: 'CGST%', key: 'cgst' },
-      { header: 'SGST%', key: 'sgst' },
-      { header: 'Grand Total', key: 'grandTotal' },
-      { header: 'Remark', key: 'remark' }
+      { key: 'slNo', width: 10 },
+      { key: 'collegeISRNo', width: 18 },
+      { key: 'itISRNo', width: 18 },
+      { key: 'particulars', width: 35 },
+      { key: 'serialNumbers', width: 25 },
+      { key: 'vendor', width: 25 },
+      { key: 'billDate', width: 15 },
+      { key: 'billNo', width: 18 },
+      { key: 'quantity', width: 12 },
+      { key: 'rate', width: 15 },
+      { key: 'amount', width: 15 },
+      { key: 'cgst', width: 10 },
+      { key: 'sgst', width: 10 },
+      { key: 'grandTotal', width: 18 },
+      { key: 'remark', width: 25 }
     ];
+
+    // Define border style
+    const borderStyle = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+
+    // Add column headers manually in row 3
+    const headerRow = worksheet.getRow(3);
+    headerRow.values = ['Sl No.', 'College ISR No.', 'IT ISR No.', 'Particulars', 'Serial Numbers', 'Vendor', 'Bill Date', 'Bill No.', 'Quantity', 'Rate', 'Amount', 'CGST%', 'SGST%', 'Grand Total', 'Remark'];
+    headerRow.font = { bold: true, size: 12 };
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    // Apply gray background only to columns up to Remarks (A-O)
+    for (let col = 1; col <= 15; col++) {
+      const cell = headerRow.getCell(col);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+    }
+    headerRow.height = 25;
+    headerRow.eachCell((cell) => {
+      cell.border = borderStyle;
+    });
 
     // Map report data to flat objects for Excel rows
     let rows = [];
     let slNoCounter = 1;
     
+    // Helper function to create rows for an item with serial numbers
+    const createRowsForItem = (asset, sub, isLegacy = false) => {
+      const baseRow = {
+        collegeISRNo: asset.collegeISRNo || '',
+        itISRNo: asset.itISRNo || '',
+        particulars: isLegacy ? asset.itemName || '' : sub.particulars || '',
+        vendor: asset.vendorName || asset.vendor || '',
+        billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
+        billNo: asset.billNo || '',
+        quantity: isLegacy ? asset.quantity || 0 : sub.quantity || 0,
+        rate: isLegacy ? asset.pricePerItem || 0 : sub.rate || 0,
+        amount: isLegacy ? asset.totalAmount || 0 : sub.amount || 0,
+        cgst: isLegacy ? asset.cgst || 0 : sub.cgst || 0,
+        sgst: isLegacy ? asset.sgst || 0 : sub.sgst || 0,
+        grandTotal: isLegacy ? asset.grandTotal || asset.totalAmount || 0 : sub.grandTotal || 0,
+        remark: asset.remark || ''
+      };
+
+      // Get serial numbers
+      const serialNumbers = isLegacy ? [] : (sub.serialNumbers && sub.serialNumbers.length > 0 ? sub.serialNumbers.filter(s => s.trim()) : (sub.serialNumber ? sub.serialNumber.split('\n').filter(s => s.trim()) : []));
+
+      if (serialNumbers.length > 0) {
+        // Create one row per serial number
+        serialNumbers.forEach(serial => {
+          rows.push({
+            slNo: slNoCounter++,
+            ...baseRow,
+            serialNumbers: serial
+          });
+        });
+      } else {
+        // No serial numbers, create one row
+        rows.push({
+          slNo: slNoCounter++,
+          ...baseRow,
+          serialNumbers: ''
+        });
+      }
+    };
+
     // For item report type, flatten individual items
     if (reportType === 'item') {
       report.forEach(asset => {
@@ -532,43 +616,13 @@ export const exportExcel = async (req, res, next) => {
           asset.items.forEach(sub => {
             // Filter items by name if specified
             if (!itemName || sub.particulars?.toLowerCase().includes(itemName.toLowerCase())) {
-              rows.push({
-                slNo: slNoCounter++,
-                collegeISRNo: asset.collegeISRNo || '',
-                itISRNo: asset.itISRNo || '',
-                particulars: sub.particulars || '',
-                vendor: asset.vendorName || asset.vendor || '',
-                billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-                billNo: asset.billNo || '',
-                quantity: sub.quantity || 0,
-                rate: sub.rate || 0,
-                amount: sub.amount || 0,
-                cgst: sub.cgst || 0,
-                sgst: sub.sgst || 0,
-                grandTotal: sub.grandTotal || 0,
-                remark: asset.remark || ''
-              });
+              createRowsForItem(asset, sub);
             }
           });
         } else {
           // Legacy single item
           if (!itemName || asset.itemName?.toLowerCase().includes(itemName.toLowerCase())) {
-            rows.push({
-              slNo: slNoCounter++,
-              collegeISRNo: asset.collegeISRNo || '',
-              itISRNo: asset.itISRNo || '',
-              particulars: asset.itemName || '',
-              vendor: asset.vendorName || asset.vendor || '',
-              billDate: asset.billDate ? new Date(asset.billDate).toLocaleDateString() : '',
-              billNo: asset.billNo || '',
-              quantity: asset.quantity || 0,
-              rate: asset.pricePerItem || 0,
-              amount: asset.totalAmount || 0,
-              cgst: asset.cgst || 0,
-              sgst: asset.sgst || 0,
-              grandTotal: asset.grandTotal || asset.totalAmount || 0,
-              remark: asset.remark || ''
-            });
+            createRowsForItem(asset, asset, true);
           }
         }
       });
@@ -577,40 +631,10 @@ export const exportExcel = async (req, res, next) => {
       report.forEach(item => {
         if (Array.isArray(item.items) && item.items.length > 0) {
           item.items.forEach(sub => {
-            rows.push({
-              slNo: slNoCounter++,
-              collegeISRNo: item.collegeISRNo || '',
-              itISRNo: item.itISRNo || '',
-              particulars: sub.particulars || '',
-              vendor: item.vendorName || item.vendor || '',
-              billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-              billNo: item.billNo || '',
-              quantity: sub.quantity || 0,
-              rate: sub.rate || 0,
-              amount: sub.amount || 0,
-              cgst: sub.cgst || 0,
-              sgst: sub.sgst || 0,
-              grandTotal: sub.grandTotal || 0,
-              remark: item.remark || ''
-            });
+            createRowsForItem(item, sub);
           });
         } else {
-          rows.push({
-            slNo: slNoCounter++,
-            collegeISRNo: item.collegeISRNo || '',
-            itISRNo: item.itISRNo || '',
-            particulars: item.itemName || '',
-            vendor: item.vendorName || item.vendor || '',
-            billDate: item.billDate ? new Date(item.billDate).toLocaleDateString() : '',
-            billNo: item.billNo || '',
-            quantity: item.quantity || 0,
-            rate: item.pricePerItem || 0,
-            amount: item.totalAmount || 0,
-            cgst: item.cgst || 0,
-            sgst: item.sgst || 0,
-            grandTotal: item.grandTotal || item.totalAmount || 0,
-            remark: item.remark || ''
-          });
+          createRowsForItem(item, item, true);
         }
       });
     }
@@ -622,6 +646,7 @@ export const exportExcel = async (req, res, next) => {
         collegeISRNo: '',
         itISRNo: '',
         particulars: 'No data found for the selected filters',
+        serialNumbers: '',
         vendor: '',
         billDate: '',
         billNo: '',
@@ -635,9 +660,59 @@ export const exportExcel = async (req, res, next) => {
       });
     }
 
-    // Add data rows starting from row 6 (after headers)
+    // Add data rows starting from row 4 (immediately after headers)
+    const startRow = 4;
     rows.forEach(row => {
       worksheet.addRow(row);
+    });
+    const endRow = worksheet.rowCount;
+
+
+
+
+
+    // Apply borders and center alignment to data rows
+    for (let rowNum = startRow; rowNum <= endRow; rowNum++) {
+      const row = worksheet.getRow(rowNum);
+      row.eachCell((cell) => {
+        cell.border = borderStyle;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      row.height = 20; // Set row height
+    }
+
+    // Merge cells for consecutive rows with same values
+    const columnsToMerge = ['collegeISRNo', 'itISRNo', 'particulars', 'vendor', 'billDate', 'billNo', 'quantity', 'rate', 'amount', 'cgst', 'sgst', 'grandTotal', 'remark'];
+    
+    columnsToMerge.forEach(columnKey => {
+      const columnIndex = worksheet.columns.findIndex(col => col.key === columnKey) + 1;
+      if (columnIndex === 0) return;
+      
+      let mergeStart = startRow;
+      let currentValue = rows[0] ? rows[0][columnKey] : null;
+      
+      for (let i = 1; i <= rows.length; i++) {
+        const nextValue = i < rows.length ? rows[i][columnKey] : null;
+        
+        if (nextValue !== currentValue || i === rows.length) {
+          const mergeEnd = startRow + i - 1;
+          
+          if (mergeEnd > mergeStart) {
+            // Merge cells
+            worksheet.mergeCells(mergeStart, columnIndex, mergeEnd, columnIndex);
+            
+            // Center align merged cells
+            const mergedCell = worksheet.getCell(mergeStart, columnIndex);
+            mergedCell.alignment = { 
+              vertical: 'middle', 
+              horizontal: 'center' 
+            };
+          }
+          
+          mergeStart = startRow + i;
+          currentValue = nextValue;
+        }
+      }
     });
 
     // Add total row at the end with Excel formulas
@@ -651,6 +726,7 @@ export const exportExcel = async (req, res, next) => {
         collegeISRNo: '',
         itISRNo: '',
         particulars: 'TOTAL',
+        serialNumbers: '',
         vendor: '',
         billDate: '',
         billNo: '',
@@ -663,13 +739,31 @@ export const exportExcel = async (req, res, next) => {
         remark: ''
       });
       
-      // Make total row bold
-      totalRow.font = { bold: true };
+      // Apply borders, center alignment, and styling to total row
+      totalRow.eachCell((cell) => {
+        cell.border = borderStyle;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      totalRow.height = 25;
     }
 
-    // Auto-fit column widths
-    worksheet.columns.forEach(column => {
-      column.width = undefined;
+    // Auto-fit column widths based on content
+    worksheet.columns.forEach((column, index) => {
+      let maxLength = 0;
+      const columnLetter = String.fromCharCode(65 + index);
+      
+      worksheet.eachRow((row, rowNumber) => {
+        const cell = row.getCell(index + 1);
+        if (cell.value) {
+          const cellLength = cell.value.toString().length;
+          if (cellLength > maxLength) {
+            maxLength = cellLength;
+          }
+        }
+      });
+      
+      column.width = Math.max(maxLength + 2, column.width || 10);
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1137,15 +1231,24 @@ export const exportMergedBillsPDF = async (req, res, next) => {
       });
     }
 
-    // Create a new PDF document
-    const doc = new PDFDocument({ margin: 50 });
-    
-    // Set response headers
+    // Set response headers first
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="merged_bills_${new Date().toISOString().split('T')[0]}.pdf"`);
     
+    // Create a new PDF document
+    const doc = new PDFDocument({ margin: 30, size: 'A4' });
+    
     // Pipe the PDF to response
     doc.pipe(res);
+    
+    // Handle PDF errors
+    doc.on('error', (err) => {
+      console.error('PDF generation error:', err);
+    });
+    
+    res.on('error', (err) => {
+      console.error('Response stream error:', err);
+    });
 
     // Add title page
     doc.fontSize(20).text('Asset Bills Report', { align: 'center' });
@@ -1169,82 +1272,150 @@ export const exportMergedBillsPDF = async (req, res, next) => {
     doc.fontSize(14).text('Asset Details:', { underline: true });
     doc.moveDown();
 
+    let currentY = doc.y;
+    
     assets.forEach((asset, index) => {
       // Add page break for each asset (except first)
       if (index > 0) {
         doc.addPage();
+        currentY = 50; // Reset Y position for new page
       }
 
       doc.fontSize(12)
-        .text(`${index + 1}. Bill #${asset.billNo || 'N/A'}`, { underline: true })
-        .text(`Date: ${asset.billDate ? new Date(asset.billDate).toLocaleDateString() : 'N/A'}`)
-        .text(`Department: ${asset.department?.name || 'N/A'}`)
-        .text(`Type: ${asset.type || 'N/A'}`)
-        .text(`Vendor: ${asset.vendorName || 'N/A'}`)
-        .text(`Contact: ${asset.contactNumber || 'N/A'}`)
-        .text(`Email: ${asset.email || 'N/A'}`)
-        .moveDown();
+        .text(`${index + 1}. Bill #${asset.billNo || 'N/A'}`, 50, currentY, { underline: true });
+      currentY += 20;
+      
+      doc.fontSize(10)
+        .text(`Date: ${asset.billDate ? new Date(asset.billDate).toLocaleDateString() : 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Department: ${asset.department?.name || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Type: ${asset.type || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Vendor: ${asset.vendorName || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Contact: ${asset.contactNumber || 'N/A'}`, 50, currentY);
+      currentY += 15;
+      
+      doc.text(`Email: ${asset.email || 'N/A'}`, 50, currentY);
+      currentY += 20;
 
       // Add items table if available
       if (asset.items && asset.items.length > 0) {
-        doc.text('Items:', { underline: true });
-        
-        // Table headers
-        const startX = 50;
-        let currentY = doc.y;
-        
-        doc.text('Particulars', startX, currentY, { width: 120 })
-           .text('Qty', startX + 120, currentY, { width: 40 })
-           .text('Rate', startX + 160, currentY, { width: 60 })
-           .text('CGST%', startX + 220, currentY, { width: 50 })
-           .text('SGST%', startX + 270, currentY, { width: 50 })
-           .text('Total', startX + 320, currentY, { width: 80 });
-        
+        doc.fontSize(11).text('Items:', 50, currentY, { underline: true });
         currentY += 20;
         
+        // Table headers with proper spacing
+        const startX = 50;
+        
+        doc.fontSize(9)
+           .text('Sl.No', 50, currentY)
+           .text('Particulars', 85, currentY)
+           .text('Serial No', 210, currentY)
+           .text('Qty', 340, currentY)
+           .text('Rate', 370, currentY)
+           .text('CGST%', 430, currentY)
+           .text('SGST%', 470, currentY)
+           .text('Total', 510, currentY);
+        
+        currentY += 15;
+        
         // Draw line under headers
-        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        doc.moveTo(50, currentY).lineTo(570, currentY).stroke();
         currentY += 10;
         
-        // Add items
+        // Add items with serial numbers
+        let serialCounter = 1;
         asset.items.forEach(item => {
-          doc.text(item.particulars || '', startX, currentY, { width: 120 })
-             .text((item.quantity || 0).toString(), startX + 120, currentY, { width: 40 })
-             .text(`₹${(item.rate || 0).toLocaleString()}`, startX + 160, currentY, { width: 60 })
-             .text(`${item.cgst || 0}%`, startX + 220, currentY, { width: 50 })
-             .text(`${item.sgst || 0}%`, startX + 270, currentY, { width: 50 })
-             .text(`₹${(item.grandTotal || 0).toLocaleString()}`, startX + 320, currentY, { width: 80 });
-          currentY += 15;
+          const serialNumbers = item.serialNumbers && item.serialNumbers.length > 0 
+            ? item.serialNumbers.filter(s => s.trim()) 
+            : (item.serialNumber ? item.serialNumber.split('\n').filter(s => s.trim()) : []);
+          
+          if (serialNumbers.length > 0) {
+            // Create one row per serial number
+            serialNumbers.forEach(serial => {
+              doc.fontSize(8)
+                 .text(serialCounter.toString(), 50, currentY)
+                 .text(item.particulars || '', 85, currentY, { width: 120, height: 30 })
+                 .text(serial, 210, currentY, { width: 125, height: 30 })
+                 .text((item.quantity || 0).toString(), 340, currentY)
+                 .text(`₹${(item.rate || 0).toLocaleString()}`, 370, currentY, { width: 55 })
+                 .text(`${item.cgst || 0}%`, 430, currentY)
+                 .text(`${item.sgst || 0}%`, 470, currentY)
+                 .text(`₹${(item.grandTotal || 0).toLocaleString()}`, 510, currentY, { width: 60 });
+              currentY += 30;
+              serialCounter++;
+            });
+          } else {
+            // No serial numbers, create one row
+            doc.fontSize(8)
+               .text(serialCounter.toString(), 50, currentY)
+               .text(item.particulars || '', 85, currentY, { width: 120, height: 30 })
+               .text('N/A', 210, currentY)
+               .text((item.quantity || 0).toString(), 340, currentY)
+               .text(`₹${(item.rate || 0).toLocaleString()}`, 370, currentY, { width: 55 })
+               .text(`${item.cgst || 0}%`, 430, currentY)
+               .text(`${item.sgst || 0}%`, 470, currentY)
+               .text(`₹${(item.grandTotal || 0).toLocaleString()}`, 510, currentY, { width: 60 });
+            currentY += 30;
+            serialCounter++;
+          }
         });
         
         // Total line
-        currentY += 10;
-        doc.moveTo(startX, currentY).lineTo(startX + 400, currentY).stroke();
+        currentY += 5;
+        doc.moveTo(50, currentY).lineTo(570, currentY).stroke();
         currentY += 10;
         
         const assetTotal = asset.grandTotal || asset.totalAmount || 0;
-        doc.fontSize(12).text(`Asset Total: ₹${assetTotal.toLocaleString()}`, startX + 250, currentY, { width: 150 });
+        doc.fontSize(10).text(`Asset Total: ₹${assetTotal.toLocaleString()}`, 410, currentY);
+        currentY += 20;
       } else {
         // Legacy single item display
-        doc.text(`Item: ${asset.itemName || 'N/A'}`)
-           .text(`Quantity: ${asset.quantity || 'N/A'}`)
-           .text(`Price per Item: ₹${(asset.pricePerItem || 0).toLocaleString()}`)
-           .text(`Total Amount: ₹${(asset.totalAmount || 0).toLocaleString()}`);
+        doc.fontSize(10)
+           .text(`Item: ${asset.itemName || 'N/A'}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Quantity: ${asset.quantity || 'N/A'}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Price per Item: ₹${(asset.pricePerItem || 0).toLocaleString()}`, 50, currentY);
+        currentY += 15;
+        
+        doc.text(`Total Amount: ₹${(asset.totalAmount || 0).toLocaleString()}`, 50, currentY);
+        currentY += 15;
       }
       
       if (asset.remark) {
-        doc.moveDown().text(`Remark: ${asset.remark}`);
+        currentY += 15;
+        doc.fontSize(9)
+           .text('Remark:', 50, currentY, { width: 60 })
+           .text(asset.remark, 115, currentY, { width: 450, align: 'left' });
+        currentY += 20;
       }
       
-      doc.moveDown(2);
+      // Ensure we don't exceed page boundaries
+      if (currentY > 700) {
+        doc.addPage();
+        currentY = 50;
+      }
+      currentY += 10;
     });
 
     // Finalize the PDF
     doc.end();
 
   } catch (error) {
+    console.error('Merged PDF export error:', error);
     if (!res.headersSent) {
-      next(error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate merged PDF'
+      });
     }
   }
 };

@@ -49,20 +49,10 @@ export function Sidebar() {
     closed: { x: -280, opacity: 0 },
   };
 
-  // Dynamic navigation items based on user role
-  const dynamicNavigationItems = [
-    ...navigationItems,
-    ...(user?.role === 'admin' ? [{
-      title: 'Admin Dashboard',
-      href: '/admin',
-      icon: Shield,
-    }] : []),
-  ];
-
-  // Filter navigation items for department-officer: only show Dashboard
-  const filteredNavigationItems = user?.role === 'department-officer'
-    ? dynamicNavigationItems.filter(item => item.href === '/dashboard')
-    : dynamicNavigationItems;
+  // Filter navigation items based on user role
+  const filteredNavigationItems = user?.role === 'admin'
+    ? navigationItems.filter(item => item.href !== '/dashboard') // Remove dashboard for admin
+    : navigationItems;
 
   return (
     <AnimatePresence>

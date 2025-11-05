@@ -5,11 +5,14 @@ import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FormInput } from '@/components/ui/form-input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { OfficerReasonDialog } from '@/components/OfficerReasonDialog';
 
 const itemSchema = z.object({
   particulars: z.string().min(1, 'Particulars is required'),
+  serialNumber: z.string().optional(),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   rate: z.number().min(0, 'Rate must be positive'),
   cgst: z.number().min(0).max(100, 'CGST must be between 0-100'),
@@ -20,6 +23,7 @@ type ItemFormValues = z.infer<typeof itemSchema>;
 
 interface Item {
   particulars: string;
+  serialNumber?: string;
   quantity: number;
   rate: number;
   cgst: number;
@@ -56,6 +60,7 @@ export function ItemEditDialog({
     register,
     handleSubmit,
     watch,
+    setValue,
     reset: resetForm,
     formState: { errors }
   } = useForm<ItemFormValues>({
@@ -67,6 +72,7 @@ export function ItemEditDialog({
     if (item) {
       resetForm({
         particulars: item.particulars,
+        serialNumber: item.serialNumber || '',
         quantity: item.quantity,
         rate: item.rate,
         cgst: item.cgst,
@@ -216,6 +222,34 @@ export function ItemEditDialog({
               {...register('particulars')}
               error={errors.particulars?.message}
             />
+            
+            <div>
+              <Label htmlFor="serialNumber">Serial Numbers (optional)</Label>
+              <div className="mt-1 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {Array.from({ length: watchedValues.quantity || 1 }, (_, idx) => {
+                    const serialNumbers = (watchedValues.serialNumber || '').split('\n').filter(s => s.trim());
+                    return (
+                      <FormInput
+                        key={idx}
+                        placeholder={`Serial ${idx + 1}`}
+                        value={serialNumbers[idx] || ''}
+                        onChange={(e) => {
+                          const newSerials = [...Array(watchedValues.quantity || 1)].map((_, i) => serialNumbers[i] || '');
+                          newSerials[idx] = e.target.value.trim();
+                          setValue('serialNumber', newSerials.filter(s => s.trim()).join('\n'));
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                {watchedValues.quantity && (
+                  <p className="text-sm text-gray-600">
+                    Serial numbers: {(watchedValues.serialNumber || '').split('\n').filter(s => s.trim()).length}/{watchedValues.quantity}
+                  </p>
+                )}
+              </div>
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <FormInput

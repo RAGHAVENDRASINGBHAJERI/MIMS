@@ -54,7 +54,25 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
-  }, []);
+    
+    // Check for prefilled data from password reset approval
+    const prefilledData = sessionStorage.getItem('prefilledUserData');
+    if (prefilledData) {
+      try {
+        const userData = JSON.parse(prefilledData);
+        reset({
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          department: userData.department || '',
+          password: 'temp123' // Default password
+        });
+        sessionStorage.removeItem('prefilledUserData');
+      } catch (error) {
+        console.error('Error parsing prefilled data:', error);
+      }
+    }
+  }, [reset]);
 
   const fetchUsers = async () => {
     try {
@@ -85,6 +103,20 @@ export default function UserManagement() {
   const onSubmit = async (data: UserFormValues) => {
     setIsLoading(true);
     try {
+      // Check for duplicate email before creating
+      if (!editingUser) {
+        const existingUser = users.find(u => u.email === data.email);
+        if (existingUser) {
+          toast({
+            title: 'Error',
+            description: 'User with this email already exists',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       if (editingUser) {
         await api.put(`/api/admin/users/${editingUser._id}`, data);
         toast({

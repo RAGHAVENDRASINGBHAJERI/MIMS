@@ -43,7 +43,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://your-app.netlify.app',
+    'https://soft-mochi-a950f2.netlify.app',
     /\.netlify\.app$/,
     /\.vercel\.app$/,
     /\.onrender\.com$/

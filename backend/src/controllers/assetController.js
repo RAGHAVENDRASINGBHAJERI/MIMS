@@ -54,6 +54,12 @@ export const createAsset = async (req, res, next) => {
     if (items) {
       try {
         parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+        // Ensure serial numbers are properly handled
+        parsedItems = parsedItems.map(item => ({
+          ...item,
+          serialNumber: item.serialNumber || '',
+          serialNumbers: item.serialNumbers || []
+        }));
       } catch (e) {
         // Failed to parse items, using empty array
       }
@@ -85,6 +91,20 @@ export const createAsset = async (req, res, next) => {
     });
 
     await asset.populate('department', 'name type');
+    
+    // Create audit log for asset creation
+    await AuditLog.create({
+      action: 'CREATE',
+      entityType: 'ASSET',
+      entityId: asset._id,
+      userId: req.user._id,
+      reason: 'Asset created',
+      billInfo: {
+        billNumber: asset.billNo,
+        vendorName: asset.vendorName
+      }
+    });
+    
     res.status(201).json({
       success: true,
       data: asset
@@ -278,6 +298,12 @@ export const updateAsset = async (req, res, next) => {
     if (items) {
       try {
         parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+        // Ensure serial numbers are properly handled
+        parsedItems = parsedItems.map(item => ({
+          ...item,
+          serialNumber: item.serialNumber || '',
+          serialNumbers: item.serialNumbers || []
+        }));
       } catch (e) {
         // Failed to parse items, using empty array
       }
@@ -331,6 +357,10 @@ export const updateAsset = async (req, res, next) => {
       userId: req.user._id,
       reason,
       officerName,
+      billInfo: {
+        billNumber: asset.billNo,
+        vendorName: asset.vendorName
+      },
       oldData: originalAsset,
       newData: asset.toObject()
     });
@@ -398,6 +428,10 @@ export const deleteAsset = async (req, res, next) => {
       userId: req.user._id,
       reason,
       officerName,
+      billInfo: {
+        billNumber: asset.billNo,
+        vendorName: asset.vendorName
+      },
       oldData: asset
     });
 
@@ -449,6 +483,8 @@ export const updateAssetItem = async (req, res, next) => {
     // Update the specific item
     asset.items[itemIndex] = {
       particulars: updatedItem.particulars,
+      serialNumber: updatedItem.serialNumber || '',
+      serialNumbers: updatedItem.serialNumbers || [],
       quantity: updatedItem.quantity,
       rate: updatedItem.rate,
       cgst: updatedItem.cgst,
@@ -470,11 +506,15 @@ export const updateAssetItem = async (req, res, next) => {
     // Create audit log
     await AuditLog.create({
       action: 'UPDATE',
-      entityType: 'ASSET_ITEM',
+      entityType: 'ASSET',
       entityId: asset._id,
       userId: req.user._id,
       reason,
       officerName,
+      billInfo: {
+        billNumber: asset.billNo,
+        vendorName: asset.vendorName
+      },
       oldData: { itemIndex, item: originalItem },
       newData: { itemIndex, item: updatedItem }
     });
@@ -545,11 +585,15 @@ export const deleteAssetItem = async (req, res, next) => {
     // Create audit log
     await AuditLog.create({
       action: 'DELETE',
-      entityType: 'ASSET_ITEM',
+      entityType: 'ASSET',
       entityId: asset._id,
       userId: req.user._id,
       reason,
       officerName,
+      billInfo: {
+        billNumber: asset.billNo,
+        vendorName: asset.vendorName
+      },
       oldData: { itemIndex, item: deletedItem }
     });
 

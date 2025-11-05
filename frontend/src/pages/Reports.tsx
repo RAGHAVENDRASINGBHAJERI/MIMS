@@ -422,6 +422,7 @@ export default function Reports() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left p-2 text-xs font-medium text-gray-500">Particulars</th>
+                <th className="text-left p-2 text-xs font-medium text-gray-500">Serial Numbers</th>
                 <th className="text-left p-2 text-xs font-medium text-gray-500">Qty</th>
                 <th className="text-left p-2 text-xs font-medium text-gray-500">Rate</th>
                 <th className="text-left p-2 text-xs font-medium text-gray-500">CGST%</th>
@@ -435,6 +436,36 @@ export default function Reports() {
               {items.map((item: any, index: number) => (
                 <tr key={index} className="border-b border-gray-100">
                   <td className="p-2 text-gray-700">{item.particulars}</td>
+                  <td className="p-2 text-gray-700">
+                    {(item.serialNumbers && item.serialNumbers.length > 0) || item.serialNumber ? (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                            title="View Serial Numbers"
+                          >
+                            +
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Serial Numbers - {item.particulars}</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-2">
+                            <div className="max-h-60 overflow-y-auto">
+                              <pre className="text-sm font-mono whitespace-pre-wrap bg-gray-50 p-3 rounded">
+                                {item.serialNumbers && item.serialNumbers.length > 0 ? item.serialNumbers.join('\n') : item.serialNumber}
+                              </pre>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <span className="text-gray-400 text-xs">No serial numbers</span>
+                    )}
+                  </td>
                   <td className="p-2 text-gray-700">{item.quantity}</td>
                   <td className="p-2 text-gray-700">₹{item.rate?.toLocaleString()}</td>
                   <td className="p-2 text-gray-700">{item.cgst}%</td>
@@ -468,7 +499,7 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-        <div className="flex gap-2 mt-3">
+        <div className="flex flex-wrap gap-2 mt-3">
           <Button
             variant="outline"
             size="sm"
@@ -653,18 +684,7 @@ export default function Reports() {
           variants={containerVariants}
           className="mb-6"
         >
-          <motion.div variants={itemVariants}>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/')}
-                className="mb-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </motion.div>
-          </motion.div>
+          
           
           <motion.div className="flex items-center gap-3 mb-2" variants={itemVariants}>
             <div className="p-2 bg-info/10 rounded-lg">
@@ -926,7 +946,7 @@ export default function Reports() {
                 <h2 className="text-lg font-semibold text-foreground">Report Filters</h2>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {reportType === 'item' && (
                   <div className="space-y-2">
                     <Label>Item Name</Label>
@@ -978,11 +998,12 @@ export default function Reports() {
 
                 <div className="space-y-2">
                   <Label>Asset Type</Label>
-                  <Select value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: (value as 'capital' | 'revenue') || undefined })}>
+                  <Select value={filters.type || 'all'} onValueChange={(value) => setFilters({ ...filters, type: value === 'all' ? undefined : (value as 'capital' | 'revenue') })}>
                     <SelectTrigger>
                       <SelectValue placeholder="All types" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
                       <SelectItem value="capital">Capital Assets</SelectItem>
                       <SelectItem value="revenue">Revenue Assets</SelectItem>
                     </SelectContent>
@@ -1008,7 +1029,7 @@ export default function Reports() {
                 </div>
               </div>
               
-              <div className="flex flex-wrap gap-2 sm:gap-4 mt-6">
+              <div className="flex flex-wrap gap-2 mt-6">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button onClick={() => handleGenerateReportClick()} disabled={isLoading}>
                     {isLoading ? (
@@ -1026,10 +1047,11 @@ export default function Reports() {
                   <Button 
                     variant="outline" 
                     onClick={() => {
-                      setFilters({});
+                      const baseFilters: Partial<ReportFilters> = {};
                       if (!isAdmin && !isChiefAdministrativeOfficer && user?.department?._id) {
-                        setFilters({ departmentId: user.department._id });
+                        baseFilters.departmentId = user.department._id;
                       }
+                      setFilters(baseFilters);
                     }}
                     disabled={isLoading}
                   >
@@ -1094,7 +1116,7 @@ export default function Reports() {
             {/* Summary Cards */}
             {reportData.summary && (
               <motion.div
-                className="grid grid-cols-1 md:grid-cols-4 gap-4"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -1152,7 +1174,7 @@ export default function Reports() {
               <motion.div variants={itemVariants}>
                 <Card className="p-6 bg-gradient-card shadow-card">
                   <h3 className="text-lg font-semibold text-foreground mb-4">Visual Analytics</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Pie Chart for Capital vs Revenue */}
                     <div>
                       <h4 className="text-md font-medium text-foreground mb-2">Asset Types Distribution</h4>
@@ -1364,7 +1386,7 @@ export default function Reports() {
                                   </td>
                                   <td className="p-2 text-sm text-muted-foreground">{item.billDate ? new Date(item.billDate).toLocaleDateString() : 'N/A'}</td>
                                   <td className="p-2">
-                                    <div className="flex gap-1">
+                                    <div className="flex flex-wrap gap-1">
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1421,7 +1443,7 @@ export default function Reports() {
                                   ₹{item.totalAmount?.toLocaleString() || '0'}
                                 </td>
                                 <td className="p-2">
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-wrap gap-2">
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
                                         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
@@ -1463,7 +1485,7 @@ export default function Reports() {
                                 ₹{item.totalAmount?.toLocaleString() || '0'}
                               </td>
                               <td className="p-2">
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                   <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                                     <Button
                                       variant="ghost"

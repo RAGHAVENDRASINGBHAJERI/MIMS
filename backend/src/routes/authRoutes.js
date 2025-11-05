@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe, refreshToken } from '../controllers/authController.js';
+import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe, refreshToken, changePassword, updateProfile } from '../controllers/authController.js';
 import { disableAfterAdmin } from '../middleware/disableAfterAdmin.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -17,7 +17,15 @@ router.post('/register', protect, authorize('admin'), register);
 router.post('/login', login);
 
 // POST /api/auth/request-password-reset
-router.post('/request-password-reset', requestPasswordReset);
+router.post('/request-password-reset', (req, res, next) => {
+  // Optional authentication - if token exists, verify it
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    protect(req, res, next);
+  } else {
+    next();
+  }
+}, requestPasswordReset);
 
 // POST /api/auth/reset-password
 router.post('/reset-password', resetPassword);
@@ -27,5 +35,11 @@ router.get('/me', protect, getMe);
 
 // POST /api/auth/refresh-token
 router.post('/refresh-token', refreshToken);
+
+// POST /api/auth/change-password
+router.post('/change-password', protect, changePassword);
+
+// PUT /api/auth/profile
+router.put('/profile', protect, updateProfile);
 
 export default router;

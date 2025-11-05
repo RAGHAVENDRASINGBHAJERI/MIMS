@@ -15,7 +15,8 @@ import {
   BarChart3,
   Users,
   Package,
-  Bell
+  Bell,
+  Settings
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -149,7 +150,7 @@ const DepartmentDashboard = () => {
           </motion.div>
           
           {/* Tab Navigation */}
-          <div className="flex gap-2 mt-6">
+          <div className="flex flex-wrap gap-2 mt-6">
             <Button
               variant={activeTab === 'overview' ? 'default' : 'outline'}
               onClick={() => setActiveTab('overview')}
@@ -164,6 +165,16 @@ const DepartmentDashboard = () => {
               <Bell className="h-4 w-4 mr-2" />
               Notifications
             </Button>
+            {user?.role === 'admin' && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/admin')}
+                className="ml-auto"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Admin Dashboard
+              </Button>
+            )}
           </div>
         </motion.div>
 
@@ -235,7 +246,7 @@ const DepartmentDashboard = () => {
           >
             Quick Actions
           </motion.h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {quickActions.map((action, index) => (
               <motion.div
                 key={action.title}

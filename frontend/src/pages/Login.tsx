@@ -54,8 +54,18 @@ export default function Login() {
   // Redirect to intended page or dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      const from = location.state?.from?.pathname;
+      if (from) {
+        navigate(from, { replace: true });
+      } else {
+        // Default redirect based on user role
+        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+        if (userData.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }
     }
   }, [isAuthenticated, navigate, location.state]);
 
@@ -70,12 +80,8 @@ export default function Login() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      console.log('Attempting to login with data:', { email: data.email });
-      
       // Use the API service for consistency
       const response = await api.post('/api/auth/login', data);
-      
-      console.log('Login response:', { status: response.status, data: response.data });
       
       if (!response.data.success) {
         throw new Error(response.data.error || 'Login failed');
@@ -92,19 +98,24 @@ export default function Login() {
         duration: 3000,
       });
 
-      // Navigate based on user role
+      // Only admins go to admin dashboard, everyone else goes to department dashboard
       if (userData.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      console.error('Error message:', error.message);
+      // Extract error message from axios error response
+      let errorMessage = 'Login failed';
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
       
       toast({
-        title: 'Error',
-        description: error.message || 'Login failed',
+        title: 'Login Failed',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -160,6 +171,8 @@ export default function Login() {
                   required
                   {...register('email')}
                   error={errors.email?.message}
+                  style={{ textTransform: 'none' }}
+                  autoComplete="off"
                 />
               </motion.div>
 

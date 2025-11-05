@@ -29,7 +29,9 @@ const authUser = async (req, res) => {
 // Admin: Get all users
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}).populate('department', 'name').select('-password');
+    const { role } = req.query;
+    const filter = role ? { role } : {};
+    const users = await User.find(filter).populate('department', 'name').select('-password');
     res.json({
       success: true,
       data: users,

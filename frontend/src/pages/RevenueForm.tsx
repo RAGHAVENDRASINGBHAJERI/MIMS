@@ -67,9 +67,10 @@ export default function RevenueForm() {
   const { user, isAdmin, isChiefAdministrativeOfficer } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [items, setItems] = useState<Array<{ particulars: string; quantity: number; rate: number; cgst: number; sgst: number; amount: number; grandTotal: number }>>([
-    { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }
+  const [items, setItems] = useState<Array<{ particulars: string; serialNumbers: string[]; quantity: number; rate: number; cgst: number; sgst: number; amount: number; grandTotal: number }>>([
+    { particulars: '', serialNumbers: [''], quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }
   ]);
+
   const [savedData, setSavedData] = useState<any>(null);
 
   // Auto-calc item totals
@@ -89,8 +90,10 @@ export default function RevenueForm() {
 
   // Helper functions for item management
   const addItem = () => {
-    setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }]);
+    setItems([...items, { particulars: '', serialNumbers: [''], quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }]);
   };
+
+
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
@@ -130,7 +133,10 @@ export default function RevenueForm() {
         // Populate form with draft data
         Object.keys(parsed).forEach(key => {
           if (key === 'items') {
-            setItems(parsed.items);
+            setItems(parsed.items.map((item: any) => ({
+              ...item,
+              serialNumbers: item.serialNumbers || (item.serialNumber ? [item.serialNumber] : [''])
+            })));
           } else if (key !== 'selectedFile') {
             setValue(key as keyof AssetFormValues, parsed[key]);
           }
@@ -258,7 +264,10 @@ export default function RevenueForm() {
         itISRNo: data.itISRNo,
         grandTotal: billGrandTotal,
         remark: data.remark,
-        items: validItems,
+        items: validItems.map(item => ({
+          ...item,
+          serialNumber: (item.serialNumbers || []).filter(s => s.trim()).join('\n')
+        })),
       };
 
       console.log('Asset data to send:', assetData);
@@ -448,14 +457,15 @@ export default function RevenueForm() {
                 {/* Category is automatically set to 'revenue' for revenue forms */}
 
                 {/* Dynamic Items */}
-                <div className="col-span-1 md:col-span-2 space-y-4">
+                <div className="col-span-1 lg:col-span-2 space-y-4">
                   {items.map((it, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
                       <FormInput
                         label="Particulars"
                         value={it.particulars}
                         onChange={(e) => setItems(items.map((x, i) => i===idx ? { ...x, particulars: e.target.value } : x))}
                       />
+
                       <FormInput
                         label="Qty"
                         type="number"
@@ -486,8 +496,10 @@ export default function RevenueForm() {
                           ₹{(it.grandTotal || 0).toLocaleString()}
                         </div>
                       </div>
-                      <div className="md:col-span-6 flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                      <div className="sm:col-span-2 lg:col-span-6 flex flex-wrap justify-end gap-2">
+                        {idx === items.length - 1 && (
+                          <Button type="button" variant="outline" onClick={() => setItems([...items, { particulars: '', serialNumbers: [''], quantity: 0, rate: 0, cgst: 0, sgst: 0, amount: 0, grandTotal: 0 }])}>Add Item</Button>
+                        )}
                         {items.length > 1 && (
                           <Button type="button" variant="destructive" onClick={() => setItems(items.filter((_, i) => i !== idx))}>Remove</Button>
                         )}
@@ -498,11 +510,100 @@ export default function RevenueForm() {
               </div>
             </motion.div>
 
-            {/* Vendor Information Section */}
+            {/* Serial Numbers Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <FileText className="h-4 w-4 text-orange-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Serial Numbers</h3>
+                  <p className="text-sm text-gray-600">Add serial numbers for items (optional).</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {items.map((item, itemIdx) => {
+                  if (!item.particulars.trim()) return null;
+                  
+                  const serialNumbers = item.serialNumbers || [];
+                  const maxSerials = item.quantity || 0;
+                  
+                  return (
+                    <div key={itemIdx} className="p-4 border rounded-lg bg-gray-50">
+                      <div className="mb-3">
+                        <Label className="text-sm font-medium text-gray-700">
+                          {item.particulars} (Qty: {item.quantity})
+                        </Label>
+                        <p className="text-xs text-gray-500">
+                          Serial numbers: {serialNumbers.filter(s => s.trim()).length}/{maxSerials}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {Array.from({ length: maxSerials }, (_, serialIdx) => (
+                          <FormInput
+                            key={serialIdx}
+                            placeholder={`Serial ${serialIdx + 1}`}
+                            value={serialNumbers[serialIdx] || ''}
+                            onChange={(e) => {
+                              const newItems = [...items];
+                              const newSerials = [...(newItems[itemIdx].serialNumbers || [])];
+                              newSerials[serialIdx] = e.target.value.trim();
+                              newItems[itemIdx].serialNumbers = newSerials;
+                              setItems(newItems);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+
+            {/* Bill Totals */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
+              className="border-b border-gray-200 pb-6"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center shadow-sm">
+                  <Calculator className="h-4 w-4 text-teal-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Bill Totals</h3>
+                  <p className="text-sm text-gray-600">Aggregated from all items.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormInput
+                  label="Total Amount (₹)"
+                  type="number"
+                  value={billTotalAmount}
+                  readOnly
+                  className="bg-gray-50"
+                />
+                <FormInput
+                  label="Grand Total (₹)"
+                  type="number"
+                  value={billGrandTotal}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+            </motion.div>
+
+            {/* Vendor Information Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
               className="border-b border-gray-200 pb-6"
             >
               <div className="flex items-center gap-2 mb-4">
@@ -544,6 +645,8 @@ export default function RevenueForm() {
                 />
               </div>
             </motion.div>
+
+
 
             {/* ISR Numbers Section */}
             <motion.div

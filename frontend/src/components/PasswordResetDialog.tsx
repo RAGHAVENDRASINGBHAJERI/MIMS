@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { FormInput } from '@/components/ui/form-input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface PasswordResetDialogProps {
   open: boolean;
@@ -19,6 +21,8 @@ export function PasswordResetDialog({ open, onOpenChange }: PasswordResetDialogP
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleRequestReset = async () => {
     if (!email || !reason) return;
@@ -80,13 +84,33 @@ export function PasswordResetDialog({ open, onOpenChange }: PasswordResetDialogP
       const result = await response.json();
 
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Password reset successfully. You can now login with your new password.',
-        });
+        if (result.data && result.data.token) {
+          // Auto-login with new JWT token
+          const { token: jwtToken, ...userData } = result.data;
+          login(userData, jwtToken);
+          
+          toast({
+            title: 'Success',
+            description: 'Password reset successfully. You are now logged in.',
+          });
+          
+          // Only admins go to admin dashboard, everyone else goes to department dashboard
+          if (userData.role === 'admin') {
+            navigate('/admin');
+          } else {
+            navigate('/dashboard');
+          }
+        } else {
+          toast({
+            title: 'Success',
+            description: 'Password reset successfully. You can now login with your new password.',
+          });
+        }
+        
         onOpenChange(false);
         setStep('request');
         setEmail('');
+        setReason('');
         setToken('');
         setNewPassword('');
         setConfirmPassword('');
@@ -124,6 +148,8 @@ export function PasswordResetDialog({ open, onOpenChange }: PasswordResetDialogP
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                style={{ textTransform: 'none' }}
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
