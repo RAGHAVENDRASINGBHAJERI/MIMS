@@ -117,7 +117,7 @@ export default function SelectAssetType() {
           transition={{ delay: 0.7 }}
           className="mt-12 text-center text-gray-600"
         >
-          <p className="text-sm">© 2024 Smt. Kamala and Shri Venkappa M. Agadi College of Engineering and Technology</p>
+          <p className="text-sm">© 2025 Smt. Kamala and Shri Venkappa M. Agadi College of Engineering and Technology</p>
           <p className="text-xs mt-1">Material Inward Management System</p>
         </motion.div>
       </div>
