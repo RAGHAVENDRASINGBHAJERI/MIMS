@@ -730,12 +730,12 @@ export const exportExcel = async (req, res, next) => {
         vendor: '',
         billDate: '',
         billNo: '',
-        quantity: { formula: `SUM(H${dataStartRow}:H${dataEndRow})` },
+        quantity: { formula: `SUM(I${dataStartRow}:I${dataEndRow})` },
         rate: '',
-        amount: { formula: `SUM(J${dataStartRow}:J${dataEndRow})` },
+        amount: { formula: `SUM(K${dataStartRow}:K${dataEndRow})` },
         cgst: '',
         sgst: '',
-        grandTotal: { formula: `SUM(M${dataStartRow}:M${dataEndRow})` },
+        grandTotal: { formula: `SUM(N${dataStartRow}:N${dataEndRow})` },
         remark: ''
       });
       

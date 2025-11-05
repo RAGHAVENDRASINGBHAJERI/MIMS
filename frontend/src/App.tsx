@@ -22,6 +22,7 @@ import Reports from "./pages/Reports";
 import AdminDashboard from "./pages/AdminDashboard";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
 import AdminPasswordReset from "./pages/AdminPasswordReset";
+import AdminPasswordResetInterface from "./pages/AdminPasswordResetInterface";
 import AdminManagement from "./pages/AdminManagement";
 import ProfileSetup from "./pages/ProfileSetup";
 import NotFound from "./pages/NotFound";
@@ -88,6 +89,7 @@ const App = () => (
                           <AdminPasswordReset />
                         </AdminProtectedRoute>
                       } />
+                      <Route path="/admin/reset-user-password" element={<AdminPasswordResetInterface />} />
                       <Route path="/admin/management" element={
                         <AdminProtectedRoute>
                           <AdminManagement />

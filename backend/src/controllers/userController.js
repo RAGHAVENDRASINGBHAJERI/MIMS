@@ -91,7 +91,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, department } = req.body;
+    const { name, email, role, department, password } = req.body;
 
     // Check if email is already taken by another user
     if (email) {
@@ -113,14 +113,21 @@ const updateUser = async (req, res) => {
       }
     }
 
+    const updateData = {
+      name,
+      email,
+      role,
+      department: role === 'department-officer' ? department : undefined,
+    };
+
+    // Hash password if provided
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 12);
+    }
+
     const user = await User.findByIdAndUpdate(
       id,
-      {
-        name,
-        email,
-        role,
-        department: role === 'department-officer' ? department : undefined,
-      },
+      updateData,
       { new: true }
     ).populate('department', 'name').select('-password');
 
@@ -128,9 +135,15 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
+    // Generate new token if password was changed
+    let responseData = user.toObject();
+    if (password) {
+      responseData.token = generateToken(user._id);
+    }
+
     res.json({
       success: true,
-      data: user,
+      data: responseData,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

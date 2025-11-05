@@ -113,6 +113,7 @@ export default function AdminManagement() {
     setIsSubmitting(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      // Update basic info
       const response = await fetch(`${API_URL}/api/admin/users/${selectedAdmin._id}`, {
         method: 'PUT',
         headers: {
@@ -121,14 +122,33 @@ export default function AdminManagement() {
         },
         body: JSON.stringify({
           name: formData.name,
-          email: formData.email,
-          ...(formData.password && { password: formData.password })
+          email: formData.email
         })
       });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to update admin');
+      }
+
+      // Reset password if provided
+      if (formData.password) {
+        const passwordResponse = await fetch(`${API_URL}/api/auth/admin-reset-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            userId: selectedAdmin._id,
+            newPassword: formData.password
+          })
+        });
+
+        if (!passwordResponse.ok) {
+          const error = await passwordResponse.json();
+          throw new Error(error.message || 'Failed to reset password');
+        }
       }
 
       toast({

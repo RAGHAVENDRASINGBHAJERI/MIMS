@@ -1,7 +1,8 @@
 import express from 'express';
-import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe, refreshToken, changePassword, updateProfile } from '../controllers/authController.js';
+import { register, login, createAdmin, requestPasswordReset, resetPassword, getMe, refreshToken, changePassword, updateProfile, adminResetPassword } from '../controllers/authController.js';
 import { disableAfterAdmin } from '../middleware/disableAfterAdmin.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 
@@ -41,5 +42,18 @@ router.post('/change-password', protect, changePassword);
 
 // PUT /api/auth/profile
 router.put('/profile', protect, updateProfile);
+
+// POST /api/auth/admin-reset-password
+router.post('/admin-reset-password', adminResetPassword);
+
+// GET /api/auth/users (public for password reset interface)
+router.get('/users', async (req, res) => {
+  try {
+    const users = await User.find().select('_id name email role').lean();
+    res.json({ success: true, data: users });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 export default router;

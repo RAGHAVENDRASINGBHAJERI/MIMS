@@ -59,9 +59,9 @@ export default function Login() {
         navigate(from, { replace: true });
       } else {
         // Default redirect based on user role
-        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
         if (userData.role === 'admin') {
-          navigate('/admin', { replace: true });
+          navigate('/admin-dashboard', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });
         }
@@ -95,15 +95,19 @@ export default function Login() {
       toast({
         title: 'Welcome back!',
         description: `Successfully logged in as ${userData.name}`,
-        duration: 3000,
+        duration: 2000,
       });
 
-      // Only admins go to admin dashboard, everyone else goes to department dashboard
-      if (userData.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      // Delay navigation to show toast
+      setTimeout(() => {
+        if (userData.role === 'admin') {
+          navigate('/admin-dashboard', { replace: true });
+        } else if (userData.role === 'chief-administrative-officer') {
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 1000);
     } catch (error: any) {
       // Extract error message from axios error response
       let errorMessage = 'Login failed';
