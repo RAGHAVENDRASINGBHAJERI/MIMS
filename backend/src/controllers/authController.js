@@ -26,10 +26,8 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await User.findByIdAndUpdate(userId, {
-      password: hashedPassword
-    });
+    user.password = newPassword;
+    await user.save();
 
     const jwtToken = generateToken(user._id);
 
@@ -62,7 +60,7 @@ export const register = async (req, res, next) => {
     const { name, email, password, role, department } = req.body;
 
     // Validate role if provided
-    if (role && !['admin', 'department-officer'].includes(role)) {
+    if (role && !['admin', 'chief-administrative-officer', 'department-officer'].includes(role)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid role specified'
@@ -280,10 +278,9 @@ export const resetPassword = async (req, res, next) => {
     }
 
     // Update user password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await User.findByIdAndUpdate(resetRecord.userId, {
-      password: hashedPassword
-    });
+    const user = await User.findById(resetRecord.userId);
+    user.password = newPassword;
+    await user.save();
 
     // Mark token as used
     await PasswordReset.findByIdAndUpdate(resetRecord._id, {
@@ -291,7 +288,7 @@ export const resetPassword = async (req, res, next) => {
     });
 
     // Get user data and generate new JWT token
-    const user = await User.findById(resetRecord.userId).populate('department');
+    await user.populate('department');
     const jwtToken = generateToken(user._id);
 
     res.json({
@@ -367,6 +364,43 @@ export const refreshToken = async (req, res, next) => {
         error: 'Token expired'
       });
     }
+    next(error);
+  }
+};
+
+export const adminResetPassword = async (req, res, next) => {
+  try {
+    const { userId, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Update password (let pre-save middleware handle hashing)
+    user.password = newPassword;
+    await user.save();
+
+    // Generate new token for the user
+    const newToken = generateToken(user._id);
+    const updatedUser = await User.findById(userId).populate('department');
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully by admin',
+      data: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        department: updatedUser.department,
+        token: newToken
+      }
+    });
+  } catch (error) {
     next(error);
   }
 };

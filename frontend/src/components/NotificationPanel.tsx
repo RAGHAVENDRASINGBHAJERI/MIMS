@@ -3,18 +3,19 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Bell, Check, CheckCheck, Clock, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, Clock, X, Megaphone } from 'lucide-react';
 import { notificationService } from '@/services/notificationService';
 
 interface Notification {
   _id: string;
-  type: 'update_approved' | 'update_rejected' | 'update_requested';
+  type: 'update_approved' | 'update_rejected' | 'update_requested' | 'announcement';
   title: string;
   message: string;
   billNo: string;
   isRead: boolean;
   createdAt: string;
   createdBy: { name: string };
+  announcementType?: string;
 }
 
 export function NotificationPanel() {
@@ -81,6 +82,8 @@ export function NotificationPanel() {
         return <Check className="h-4 w-4 text-green-600" />;
       case 'update_rejected':
         return <X className="h-4 w-4 text-red-600" />;
+      case 'announcement':
+        return <Megaphone className="h-4 w-4 text-purple-600" />;
       default:
         return <Clock className="h-4 w-4 text-blue-600" />;
     }
@@ -92,6 +95,8 @@ export function NotificationPanel() {
         return 'border-l-green-500';
       case 'update_rejected':
         return 'border-l-red-500';
+      case 'announcement':
+        return 'border-l-purple-500';
       default:
         return 'border-l-blue-500';
     }
@@ -160,13 +165,17 @@ export function NotificationPanel() {
                       {notification.message}
                     </p>
                     <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <span>Bill #{notification.billNo}</span>
+                      {notification.type === 'announcement' ? (
+                        <span className="capitalize">{notification.billNo} Announcement</span>
+                      ) : (
+                        <span>Bill #{notification.billNo}</span>
+                      )}
                       <span>•</span>
                       <span>{new Date(notification.createdAt).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
-                {!notification.isRead && (
+                {!notification.isRead && notification.type !== 'announcement' && (
                   <Button
                     variant="ghost"
                     size="sm"

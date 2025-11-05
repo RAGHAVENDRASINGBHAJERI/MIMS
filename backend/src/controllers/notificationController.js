@@ -1,14 +1,60 @@
 import Notification from '../models/Notification.js';
+import Announcement from '../models/Announcement.js';
 
-// Get user notifications
+// Get user notifications and announcements
 export const getUserNotifications = async (req, res, next) => {
   try {
+    // Get regular notifications
     const notifications = await Notification.find({ recipient: req.user._id })
       .populate('createdBy', 'name')
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(25);
+
+    // Get active announcements for user's department or global announcements
+    const currentDate = new Date();
+    const announcementQuery = {
+      isActive: true,
+      $and: [
+        {
+          $or: [
+            { isGlobal: true },
+            { targetDepartments: req.user.department }
+          ]
+        },
+        {
+          $or: [
+            { expiresAt: { $exists: false } },
+            { expiresAt: null },
+            { expiresAt: { $gt: currentDate } }
+          ]
+        }
+      ]
+    };
+
+    const announcements = await Announcement.find(announcementQuery)
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 })
+      .limit(25);
+
+    // Transform announcements to match notification format
+    const transformedAnnouncements = announcements.map(announcement => ({
+      _id: announcement._id,
+      type: 'announcement',
+      title: announcement.title,
+      message: announcement.message,
+      billNo: announcement.type,
+      isRead: false, // Announcements are always shown as unread
+      createdAt: announcement.createdAt,
+      createdBy: announcement.createdBy,
+      announcementType: announcement.type
+    }));
+
+    // Combine and sort by creation date
+    const allNotifications = [...notifications, ...transformedAnnouncements]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 50);
     
-    res.json({ success: true, data: notifications });
+    res.json({ success: true, data: allNotifications });
   } catch (error) {
     next(error);
   }
