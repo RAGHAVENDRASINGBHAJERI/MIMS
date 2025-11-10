@@ -61,7 +61,7 @@ const seedAssets = async () => {
     // Create assets for each department
     departments.forEach((dept, index) => {
       const vendor = vendors[index % vendors.length];
-      const billDate = new Date(2024, index % 12, (index % 28) + 1); // Spread dates across 2024
+      const billDate = new Date(2025, index % 12, (index % 28) + 1); // Spread dates across 2025
 
       // Capital Asset
       sampleAssets.push({
